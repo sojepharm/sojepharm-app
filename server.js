@@ -2,36 +2,48 @@ const express = require('express');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// إعدادات قراءة البيانات
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static('public'));
 
-// الصفحة الرئيسية
+// قاعدة بيانات مؤقتة بالذاكرة (لتخزين المنتجات والتجار مبدئياً حتى نربط قاعدة بيانات دائمة)
+let products = [
+    { id: 1, name: "منتج تجريبي للكلاب", priceA: 10, priceB: 12, priceC: 15, stock: 50, category: "كلاب" }
+];
+
+let users = [
+    { username: "admin", password: "123", role: "admin" },
+    { username: "traderA", password: "123", role: "A" },
+    { username: "traderB", password: "123", role: "B" }
+];
+
+// الصفحة الرئيسية للسيرفر
 app.get('/', (req, res) => {
     res.send(`
-        <!DOCTYPE html>
-        <html lang="ar" dir="rtl">
+        <html dir="rtl" lang="ar">
         <head>
             <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Sojepharm - لوحة التحكم</title>
+            <title>Sojepharm - نظام إدارة الجملة والمفرق</title>
             <style>
-                body { font-family: system-ui, sans-serif; background-color: #f4f6f8; margin: 0; padding: 40px; text-align: center; }
-                .card { background: white; max-width: 600px; margin: 0 auto; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-                h1 { color: #2c3e50; margin-bottom: 10px; }
-                p { color: #7f8c8d; font-size: 1.1rem; }
-                .status { display: inline-block; padding: 8px 16px; background-color: #27ae60; color: white; border-radius: 20px; font-weight: bold; margin-top: 15px; }
+                body { font-family: Tahoma, sans-serif; background: #f4f4f9; text-align: center; padding: 50px; }
+                h1 { color: #2c3e50; }
+                p { color: #555; font-size: 18px; }
+                .box { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: inline-block; margin-top: 20px; }
             </style>
         </head>
         <body>
-            <div class="card">
-                <h1>مرحباً بك في نظام Sojepharm 🚀</h1>
-                <p>تم تشغيل السيرفر بنجاح وهو جاهز لبناء لوحة التحكم وإدارة المنتجات.</p>
-                <div class="status">النظام يعمل أونلاين الآن</div>
+            <h1>🐾 مرحباً بك في نظام Sojepharm 🐾</h1>
+            <div class="box">
+                <p>السيرفر يعمل بنجاح وجاهز لاستقبال بيانات المتجر!</p>
+                <p>عدد المنتجات الحالية: <b>${products.length}</b></p>
             </div>
         </body>
         </html>
     `);
 });
 
+// تشغيل السيرفر
 app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+    console.log(`Sojepharm server is running on port ${PORT}`);
 });
