@@ -1,46 +1,94 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bioform - متجر المفرق</title>
+    <title>Bioform - Retail Orders</title>
     <style>
-        body { font-family: Tahoma, Arial, sans-serif; background-color: #f9f9f9; color: #333; margin: 0; padding: 20px; direction: rtl; }
-        .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        h1 { text-align: center; color: #2c3e50; }
-        .product-card { border: 1px solid #ddd; border-radius: 6px; padding: 15px; margin-bottom: 15px; background: #fff; display: flex; justify-content: space-between; align-items: center; }
-        .product-info h3 { margin: 0 0 5px 0; color: #27ae60; }
-        .product-info p { margin: 3px 0; color: #666; font-size: 14px; }
-        .price { font-weight: bold; color: #e74c3c; font-size: 16px; }
-        .order-btn { background: #27ae60; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; text-decoration: none; font-size: 14px; }
-        .order-btn:hover { background: #219653; }
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 20px;
+            direction: ltr;
+            text-align: left;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 5px;
+        }
+        p.subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .product-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid #ddd;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+        .product-info h3 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+        }
+        .product-info p {
+            margin: 5px 0;
+            color: #555;
+            font-size: 14px;
+        }
+        .order-btn {
+            background-color: #25d366;
+            color: white;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            transition: background 0.3s;
+            white-space: nowrap;
+        }
+        .order-btn:hover {
+            background-color: #1ebe5d;
+        }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h1>Bioform - طلبات المفرق</h1>
-        <p style="text-align: center; color: #777;">اطلب منتجاتنا المفضلة لحيواناتك الأليفة بكل سهولة.</p>
-        <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+        <h1>Bioform - Retail Orders</h1>
+        <p class="subtitle">Order your favorite pet products easily.</p>
 
-        <!-- منتج تجريبي 1 -->
+        <!-- Product 1 -->
         <div class="product-card">
             <div class="product-info">
-                <h3>طعام كلاب بالغين - بولو (20 كغ)</h3>
-                <p>المكونات: بروتين دجاج عالي الجودة، حبوب مختارة، فيتامينات أساسية.</p>
-                <p class="price">السعر: يحدد لاحقاً</p>
+                <h3>Adult Dog Food - Solo (20 kg)</h3>
+                <p><strong>Ingredients:</strong> High-quality chicken protein, selected grains, essential vitamins.</p>
+                <p><strong>Price:</strong> To be determined later</p>
             </div>
-            <a href="https://wa.me/yourphonenumber?text=مرحباً، أرغب بطلب طعام كلاب بالغين بولو 20كغ" class="order-btn" target="_blank">اطلب عبر الواتساب</a>
+            <a href="https://wa.me/?text=Hello,%20I%20want%20to%20order:%20Adult%20Dog%20Food%20-%20Solo%20(20%20kg)" class="order-btn" target="_blank">Order via WhatsApp</a>
         </div>
 
-        <!-- منتج تجريبي 2 -->
+        <!-- Product 2 -->
         <div class="product-card">
             <div class="product-info">
-                <h3>طعام قطط - كات فود (10 كغ)</h3>
-                <p>المكونات: لحم دجاج وسمك، أوميغا 3 للعناية بالفرو والصحة العامة.</p>
-                <p class="price">السعر: يحدد لاحقاً</p>
+                <h3>Cat Food - Cat Food (10 kg)</h3>
+                <p><strong>Ingredients:</strong> Chicken and fish meat, Omega 3 for fur care and general health.</p>
+                <p><strong>Price:</strong> To be determined later</p>
             </div>
-            <a href="https://wa.me/yourphonenumber?text=مرحباً، أرغب بطلب طعام قطط 10كغ" class="order-btn" target="_blank">اطلب عبر الواتساب</a>
+            <a href="https://wa.me/?text=Hello,%20I%20want%20to%20order:%20Cat%20Food%20-%20Cat%20Food%20(10%20kg)" class="order-btn" target="_blank">Order via WhatsApp</a>
         </div>
 
     </div>
