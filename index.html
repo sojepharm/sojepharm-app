@@ -1,99 +1,63 @@
-<!DOCTYPE html
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bioform - Retail Orders</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f9;
-            margin: 0;
-            padding: 20px;
-            direction: ltr;
-            text-align: left;
-        }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: #ffffff;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        }
-        h1 {
-            color: #333;
-            text-align: center;
-            margin-bottom: 5px;
-        }
-        p.subtitle {
-            text-align: center;
-            color: #666;
-            margin-bottom: 30px;
-        }
-        .product-card {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border: 1px solid #ddd;
-            padding: 20px;
-            margin-bottom: 20px;
-            border-radius: 8px;
-            background: #fafafa;
-        }
-        .product-info h3 {
-            margin: 0 0 10px 0;
-            color: #2c3e50;
-        }
-        .product-info p {
-            margin: 5px 0;
-            color: #555;
-            font-size: 14px;
-        }
-        .order-btn {
-            background-color: #25d366;
-            color: white;
-            padding: 10px 20px;
-            text-decoration: none;
-            border-radius: 5px;
-            font-weight: bold;
-            transition: background 0.3s;
-            white-space: nowrap;
-        }
-        .order-btn:hover {
-            background-color: #1ebe5d;
-        }
-    </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Pet Unleash</title>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-
-    <div class="container">
-        <h1>Bioform - Retail Orders</h1>
-        <p class="subtitle">Order your favorite pet products easily.</p>
-
-        <!-- Product 1 -->
-        <div class="product-card">
-            <div class="product-info">
-                <h3>Adult Dog Food - Solo (20 kg)</h3>
-        <img src="Best_20kg_Adult_pollo.jpg"       
-                <p><strong>Ingredients:</strong> High-quality chicken protein, selected grains, essential vitamins.</p>
-                <p><strong>Price:</strong> To be determined later</p>
-            </div>
-            <a href="https://wa.me/?text=Hello,%20I%20want%20to%20order:%20Adult%20Dog%20Food%20-%20Solo%20(20%20kg)" class="order-btn" target="_blank">Order via WhatsApp</a>
-        </div>
-
-        <!-- Product 2 -->
-        <div class="product-card">
-            <div class="product-info">
-                <h3>Cat Food - Cat Food (10 kg)</h3>
-                <img src="Best_20kg_Energy_salmone.jpg" alt="Cat Food" width="200">
-                <p><strong>Ingredients:</strong> Chicken and fish meat, Omega 3 for fur care and general health.</p>
-                <p><strong>Price:</strong> To be determined later</p>
-            </div>
-            <a href="https://wa.me/?text=Hello,%20I%20want%20to%20order:%20Cat%20Food%20-%20Cat%20Food%20(10%20kg)" class="order-btn" target="_blank">Order via WhatsApp</a>
-        </div>
-
+  <header class="site-header">
+    <div class="header-main page-width">
+      <a class="brand-logo" href="#top"><span><strong><i>PET</i> UNLEASH</strong><small>FREEDOM AND CARE FOR ALL YOUR COMPANIONS</small></span></a>
+      <label class="main-search"><input id="search" placeholder="Search for products, item code or barcode"><span>⌕</span></label>
+      <div class="header-icons"><button class="header-action" onclick="openWholesaleLogin()"><span>♙</span><small>Account</small></button><button class="header-action cart-action" onclick="openCart()"><span>🛒</span><small>Cart</small><b class="badge" data-cart-count>0</b></button></div>
     </div>
+    <nav class="main-nav page-width">
+      <button class="all-categories" onclick="document.querySelector('#departments').scrollIntoView({behavior:'smooth'})">☰&nbsp; All Categories</button>
+      <a class="active" href="#top" onclick="showHome()">Home</a><a href="#shop" onclick="showAllProducts()">Shop</a><a href="#brands">Brands</a><a href="#offers">Special Offers <em>SALE</em></a><a href="#shop" onclick="showAllProducts()">New Items</a><a href="#contact">About Us</a><a href="#contact">Contact Us</a><a class="admin-link" href="admin.html">Admin</a>
+    </nav>
+  </header>
 
+  <main id="top" class="page-width home">
+    <section id="offers" class="promos" aria-label="Special offers">
+      <button class="promo promo-orange" onclick="showAllProducts()"><span class="promo-copy"><b>20%<small>OFF</small></b><strong>OFFER TODAY</strong><i>SHOP NOW →</i></span></button>
+      <button class="promo promo-blue" onclick="showAllProducts()"><span class="promo-copy"><b class="normal">▣ NEW<br>ARRIVALS</b><i>DISCOVER NOW →</i></span></button>
+      <button class="promo promo-green" onclick="showAllProducts()"><span class="promo-copy"><b class="normal">◇ BEST<br>SELLERS</b><i>SHOP NOW →</i></span></button>
+    </section>
+
+    <section class="family-hero">
+      <div class="hero-copy"><h1>Everything<br>your pet needs,<br>all in one place.</h1><p>Premium products. Trusted brands.<br>Happy pets.</p><button class="shop-button" onclick="showAllProducts()">Shop Now&nbsp; →</button></div>
+    </section>
+
+    <section id="departments" class="department-strip" aria-label="Departments">
+      <button class="department" onclick="openDepartment('Dogs')"><img src="assets/categories/dog-bowls.png" alt="Dog"><b>Dogs</b><small>Shop now →</small></button>
+      <button class="department" onclick="openDepartment('Cats')"><img src="assets/categories/cat-bed.png" alt="Cat"><b>Cats</b><small>Shop now →</small></button>
+      <button class="department" onclick="openDepartment('Birds')"><img src="assets/categories/birds.png" alt="Bird"><b>Birds</b><small>Shop now →</small></button>
+      <button class="department" onclick="openDepartment('Aquarium')"><img src="assets/categories/aquarium.png" alt="Aquarium fish"><b>Aquarium</b><small>Shop now →</small></button>
+      <button class="department" onclick="openDepartment('Small Animals')"><img src="assets/categories/hamster.png" alt="Hamster"><b>Small Animals</b><small>Shop now →</small></button>
+      <button class="department" onclick="openDepartment('Reptiles')"><img src="assets/categories/reptiles.png" alt="Reptile"><b>Reptiles</b><small>Shop now →</small></button>
+      <button class="department" onclick="openDepartment('Garden Animals')"><img src="assets/categories/garden-animals.png" alt="Guinea pig"><b>Garden Animals</b><small>Shop now →</small></button>
+    </section>
+
+    <section id="subcategories" class="subcategory-section" hidden>
+      <div class="section-heading"><div><p id="breadcrumb">Pet Unleash</p><h2 id="departmentTitle">Dog Accessories</h2></div><button class="text-button" onclick="showAllProducts()">View all products →</button></div>
+      <div id="subcategoryGrid" class="subcategory-grid"></div>
+    </section>
+
+    <section id="shop" class="product-section" hidden>
+      <div class="section-heading"><div><p>SHOP</p><h2 id="productHeading">Featured Products</h2></div><div class="filter-controls"><select id="foodType" aria-label="Pet food"><option value="ALL">Pet Food</option><option value="Dog Food">Dog Food</option><option value="Cat Food">Cat Food</option><option value="Treats">Treats</option></select></div></div>
+      <main id="products" class="grid"></main>
+    </section>
+
+    <section id="brands" class="brand-row"><div class="section-heading"><h2>Top Brands</h2><span>View all brands →</span></div><div class="brand-list"><b>ROYAL CANIN</b><b>PRO PLAN</b><b>ACANA</b><b>ORIJEN</b><b>BIOFORM</b><b>HAPPY DOG</b><b>Dr. Clauder's</b></div></section>
+  </main>
+
+  <footer id="contact"><div class="page-width footer-grid"><div>✉ <span><b>Email</b><br>info@petunleash.com</span></div><div>☎ <span><b>Phone</b><br>+961 70 333 470</span></div><div>⌖ <span><b>Address</b><br>Lebanon</span></div><div>◷ <span><b>Working Hours</b><br>Mon - Sat: 9:00 AM - 7:00 PM</span></div></div></footer>
+
+  <div id="cartModal" class="modal"><div class="modal-card"><div class="modal-head"><h2>Your Cart</h2><button class="icon-btn" onclick="closeCart()">×</button></div><div class="modal-body"><div id="cartLines"></div><div class="cart-total"><span>Total</span><span id="cartTotal">0.00 USD</span></div><div class="customer-grid"><input id="customerName" placeholder="Customer name"><input id="customerPhone" placeholder="Phone number"></div><input id="customerAddress" style="margin-top:12px" placeholder="Delivery address"><button class="btn btn-accent" style="width:100%;margin-top:16px" onclick="confirmOrder()">Create Invoice</button></div></div></div>
+  <div id="invoiceModal" class="modal invoice-modal"><div class="modal-card invoice-card"><div class="modal-head invoice-actions"><h2>Invoice preview</h2><div><button class="btn btn-soft" onclick="window.print()">Print</button><button class="icon-btn" onclick="closeInvoice()">×</button></div></div><div id="invoiceContent" class="modal-body invoice-content"></div><div class="invoice-footer-actions"><button class="btn btn-soft" onclick="closeInvoice()">Back to cart</button><button class="btn btn-accent" onclick="sendInvoiceWhatsApp()">Send Invoice on WhatsApp</button></div></div></div>
+  <div id="wholesaleModal" class="modal"><div class="modal-card" style="max-width:420px"><div class="modal-head"><h2>Wholesale Login</h2><button class="icon-btn" onclick="closeWholesaleLogin()">×</button></div><div class="modal-body"><input id="whUser" placeholder="Username" style="margin-bottom:12px"><input id="whPass" type="password" placeholder="Password" style="margin-bottom:12px"><button class="btn btn-primary" style="width:100%" onclick="wholesaleLogin()">Login</button><button class="btn btn-soft" style="width:100%;margin-top:10px" onclick="logoutWholesale();closeWholesaleLogin()">Return to Retail</button></div></div></div>
+  <script src="data-local.js"></script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase-config.js"></script><script src="app.js"></script>
 </body>
 </html>
