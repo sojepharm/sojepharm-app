@@ -1,0 +1,257 @@
+const PHONE = "96170333470";
+const CART_KEY = "petUnleashCartV3";
+const ROLE_KEY = "petUnleashRoleV3";
+const INVOICE_KEY = "petUnleashInvoiceCounterV1";
+// Local test storage: lets us verify the complete order flow before connecting live stock.
+const LOCAL_STOCK_KEY = "petUnleashLocalStockV15";
+const LOCAL_ORDERS_KEY = "petUnleashLocalOrdersV15";
+let products = [];
+let cart = JSON.parse(localStorage.getItem(CART_KEY) || "[]");
+let activeCategory = "ALL";
+let currentInvoice = null;
+
+const departmentCards = {
+  "Dog Accessories": [
+    ["Dog Beds & Resting Places", "🛏️"], ["Leads, Collars & Harnesses", "🦮"], ["Toys", "🎾"], ["Dog Snacks", "🦴"],
+    ["Bowls", "🥣"], ["At Home", "🏠"], ["Pet Voyager", "🚗"], ["Hygiene & Care", "🧴"]
+  ],
+  "Cat Accessories": [
+    ["Cat Beds & Resting Places", "🛏️"], ["Toys", "🐭"], ["Cat Snacks", "🦴"], ["Bowls", "🥣"],
+    ["Hygiene & Care", "🧴"], ["Pet Voyager", "👜"], ["At Home", "🏠"], ["Leads, Collars & Harnesses", "🐈"]
+  ]
+};
+const categoryImages = {
+  "Dog Accessories": {
+    "Dog Beds & Resting Places": "dog-bed", "Leads, Collars & Harnesses": "dog-leads", "Toys": "dog-toys", "Dog Snacks": "dog-snacks",
+    "Bowls": "dog-bowls", "At Home": "dog-home", "Pet Voyager": "dog-voyager", "Hygiene & Care": "dog-hygiene"
+  },
+  "Cat Accessories": {
+    "Cat Beds & Resting Places": "cat-bed", "Toys": "cat-toys", "Cat Snacks": "cat-snacks", "Bowls": "cat-bowls",
+    "Hygiene & Care": "cat-hygiene", "Pet Voyager": "cat-voyager", "At Home": "cat-home", "Leads, Collars & Harnesses": "cat-leads"
+  }
+};
+
+function classifyProduct(item) {
+  const text = `${item.name || ""} ${item.description || ""}`.toLowerCase();
+  if (/food|adult|puppy|junior|salmon|chicken|beef|lamb/.test(text)) return /cat|kitten/.test(text) ? "Cat Food" : "Dog Food";
+  if (/snack|treat|chew|bone/.test(text)) return "Treats";
+  if (/lead|leash|collar|harness/.test(text)) return "Leads, Collars & Harnesses";
+  if (/toy|ball|rope/.test(text)) return "Toys";
+  if (/bed|cushion|blanket/.test(text)) return /cat/.test(text) ? "Cat Beds & Resting Places" : "Dog Beds & Resting Places";
+  if (/bowl|bottle|feeder/.test(text)) return "Bowls";
+  if (/litter|toilet/.test(text)) return "Cat Litter";
+  if (/shampoo|brush|comb|tooth|hygiene|groom/.test(text)) return "Hygiene & Care";
+  if (/carrier|transport|voyager|travel|cage/.test(text)) return "Pet Voyager";
+  return /cat/.test(text) ? "Cat Accessories" : "Dog Accessories";
+}
+
+const role = () => localStorage.getItem(ROLE_KEY) || "retail";
+const money = value => `${Number(value || 0).toFixed(2)} USD`;
+const escapeHtml = value => String(value ?? "").replace(/[&<>'\"]/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[char]));
+const isConfigured = () => window.PET_UNLEASH_SUPABASE_ANON_KEY && !window.PET_UNLEASH_SUPABASE_ANON_KEY.startsWith("PASTE_");
+const db = () => isConfigured() && window.supabase ? window.supabase.createClient(window.PET_UNLEASH_SUPABASE_URL, window.PET_UNLEASH_SUPABASE_ANON_KEY) : null;
+
+function readJson(key, fallback) {
+  try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); }
+  catch { return fallback; }
+}
+function applyLocalStock(productsList) {
+  const savedStock = readJson(LOCAL_STOCK_KEY, {});
+  return productsList.map(product => ({
+    ...product,
+    stock: Object.prototype.hasOwnProperty.call(savedStock, product.id) ? Number(savedStock[product.id]) : product.stock
+  }));
+}
+
+function normalizeProduct(item) {
+  return {
+    id: item.item_code ?? item.id,
+    barcode: item.barcode || "",
+    brand: item.brand || "TRIXIE",
+    name: item.name || "",
+    category: item.category || classifyProduct(item),
+    description: item.description || "",
+    wholesale: Number(item.wholesale || 0),
+    retail: Number(item.retail || 0),
+    stock: Number(item.stock || 0),
+    image: item.image_url || item.image || "",
+    active: item.active !== false,
+  };
+}
+
+async function getProducts() {
+  const client = db();
+  if (client) {
+    const { data, error } = await client.from("products").select("item_code,barcode,name,brand,category,description,wholesale,retail,stock,image_url,active").eq("active", true).order("name");
+    if (!error) return applyLocalStock(data.map(normalizeProduct));
+    console.warn("Could not load products from Supabase", error.message);
+  }
+  if (Array.isArray(window.PET_UNLEASH_LOCAL_PRODUCTS)) return applyLocalStock(window.PET_UNLEASH_LOCAL_PRODUCTS.map(normalizeProduct));
+  const base = await fetch("data.json").then(response => response.json());
+  return applyLocalStock(base.map(normalizeProduct));
+}
+
+function saveCart() {
+  localStorage.setItem(CART_KEY, JSON.stringify(cart));
+  updateCartCount();
+}
+function updateCartCount() {
+  document.querySelectorAll("[data-cart-count]").forEach(element => element.textContent = cart.reduce((total, line) => total + line.qty, 0));
+}
+function currentPrice(product) { return role() === "wholesale" ? product.wholesale : product.retail; }
+function filtered() {
+  const query = (document.querySelector("#search")?.value || "").toLowerCase().trim();
+  const foodType = document.querySelector("#foodType")?.value || "ALL";
+  const category = activeCategory;
+  return products.filter(product => product.active !== false)
+    .filter(product => foodType === "ALL" || product.category === foodType)
+    .filter(product => category === "ALL" || categoryMatches(product.category, category))
+    .filter(product => `${product.id} ${product.barcode} ${product.name} ${product.brand}`.toLowerCase().includes(query));
+}
+function categoryMatches(productCategory, selectedCategory) {
+  if (productCategory === selectedCategory) return true;
+  if ((selectedCategory === "Dog Snacks" || selectedCategory === "Cat Snacks") && productCategory === "Treats") return true;
+  const dog = ["Dog Beds & Resting Places", "Leads, Collars & Harnesses", "Toys", "Dog Snacks", "Bowls", "At Home", "Pet Voyager", "Hygiene & Care"];
+  const cat = ["Cat Beds & Resting Places", "Leads, Collars & Harnesses", "Toys", "Cat Snacks", "Bowls", "At Home", "Pet Voyager", "Hygiene & Care"];
+  if (selectedCategory === "Dogs") return productCategory === "Dog Food" || productCategory === "Dog Accessories" || productCategory === "Treats" || dog.includes(productCategory);
+  if (selectedCategory === "Cats") return productCategory === "Cat Food" || productCategory === "Cat Accessories" || productCategory === "Cat Litter" || cat.includes(productCategory);
+  return (selectedCategory === "Dog Accessories" && dog.includes(productCategory)) || (selectedCategory === "Cat Accessories" && cat.includes(productCategory));
+}
+function renderProducts() {
+  const grid = document.querySelector("#products");
+  if (!grid) return;
+  const list = filtered();
+  grid.innerHTML = list.map(product => `
+    <article class="card">
+      <div class="image-wrap">${product.image ? `<img src="${product.image}" alt="${product.name}">` : "🐾"}</div>
+      <div class="card-body">
+        <div class="brand">${product.brand}</div><h3>${product.name}</h3>
+        <div class="meta">Item: ${product.id}${product.barcode ? `<br>Barcode: ${product.barcode}` : ""}</div>
+        <div class="price-row"><div><small>${role() === "wholesale" ? "Wholesale" : "Retail"} price</small><div class="price">${money(currentPrice(product))}</div>${role() === "wholesale" ? `<div class="wholesale-price">Retail ${money(product.retail)}</div>` : ""}</div><div class="stock ${product.stock <= 0 ? "out" : ""}">${product.stock > 0 ? `${product.stock} in stock` : "Out of stock"}</div></div>
+        <div class="card-actions"><input id="qty-${product.id}" class="qty-input" type="number" min="1" max="${Math.max(1, product.stock)}" value="1"><button class="btn btn-primary" style="flex:1" ${product.stock <= 0 ? "disabled" : ""} onclick="addToCart('${product.id}')">Add to Cart</button></div>
+      </div>
+    </article>`).join("");
+  document.querySelectorAll("[data-role-label]").forEach(element => element.textContent = role() === "wholesale" ? "Wholesale" : "Retail");
+}
+function addToCart(id) {
+  const product = products.find(item => item.id === id);
+  const quantity = Math.max(1, Number(document.querySelector(`#qty-${CSS.escape(id)}`)?.value || 1));
+  if (!product || product.stock <= 0) return;
+  const line = cart.find(item => item.id === id);
+  const existing = line ? line.qty : 0;
+  const allowed = Math.min(quantity, product.stock - existing);
+  if (allowed <= 0) return alert("Maximum stock already in cart.");
+  if (line) line.qty += allowed; else cart.push({ id, qty: allowed });
+  saveCart();
+}
+function openCart() { renderCart(); document.querySelector("#cartModal").classList.add("open"); }
+function closeCart() { document.querySelector("#cartModal").classList.remove("open"); }
+function renderCart() {
+  const container = document.querySelector("#cartLines"); let total = 0;
+  if (!cart.length) { container.innerHTML = "<p>Your cart is empty.</p>"; document.querySelector("#cartTotal").textContent = money(0); return; }
+  container.innerHTML = cart.map(line => { const product = products.find(item => item.id === line.id); if (!product) return ""; const subtotal = currentPrice(product) * line.qty; total += subtotal; return `<div class="cart-line"><div><b>${product.name}</b><br><small>${product.id}</small></div><input type="number" min="1" max="${product.stock}" value="${line.qty}" onchange="changeQty('${product.id}',this.value)"><div><b>${money(subtotal)}</b></div><button class="icon-btn" onclick="removeLine('${product.id}')">×</button></div>`; }).join("");
+  document.querySelector("#cartTotal").textContent = money(total);
+}
+function changeQty(id, value) { const product = products.find(item => item.id === id); const line = cart.find(item => item.id === id); if (!product || !line) return; line.qty = Math.max(1, Math.min(Number(value) || 1, product.stock)); saveCart(); renderCart(); }
+function removeLine(id) { cart = cart.filter(line => line.id !== id); saveCart(); renderCart(); }
+function confirmOrder() {
+  if (!cart.length) return alert("Your cart is empty.");
+  const name = document.querySelector("#customerName").value.trim(); const phone = document.querySelector("#customerPhone").value.trim(); const address = document.querySelector("#customerAddress").value.trim();
+  if (!name || !phone) return alert("Enter customer name and phone.");
+  const items = cart.map(line => { const product = products.find(item => item.id === line.id); return { product, qty: line.qty, subtotal: currentPrice(product) * line.qty }; });
+  const total = items.reduce((sum, item) => sum + item.subtotal, 0);
+  currentInvoice = { number: nextInvoiceNumber(), date: new Date().toLocaleString(), customer: { name, phone, address }, customerType: role(), items, total };
+  closeCart();
+  renderInvoice();
+  document.querySelector("#invoiceModal").classList.add("open");
+}
+function nextInvoiceNumber() {
+  const today = new Date().toISOString().slice(0, 10).replaceAll("-", "");
+  const saved = JSON.parse(localStorage.getItem(INVOICE_KEY) || "{}");
+  const count = saved.day === today ? Number(saved.count || 0) + 1 : 1;
+  localStorage.setItem(INVOICE_KEY, JSON.stringify({ day: today, count }));
+  return `PU-${today}-${String(count).padStart(4, "0")}`;
+}
+function closeInvoice() { document.querySelector("#invoiceModal").classList.remove("open"); }
+function renderInvoice() {
+  if (!currentInvoice) return;
+  const invoice = currentInvoice;
+  document.querySelector("#invoiceContent").innerHTML = `
+    <div class="invoice-brand"><div><b>PET <i>UNLEASH</i></b><span>Freedom and care for all your companions</span></div><div class="invoice-business"><strong>Invoice</strong><span>No. ${invoice.number}</span><span>Phone: +961 70 333 470</span><span>${invoice.date}</span></div></div>
+    <div class="invoice-customer"><div><small>DELIVER TO</small><b>${escapeHtml(invoice.customer.name)}</b><span>${escapeHtml(invoice.customer.phone)}</span><span>${escapeHtml(invoice.customer.address || "Address not provided")}</span></div><div><small>CUSTOMER TYPE</small><b>${escapeHtml(invoice.customerType)}</b></div></div>
+    <table class="invoice-table"><thead><tr><th>Product</th><th>Item code</th><th>Qty</th><th>Unit price</th><th>Total</th></tr></thead><tbody>${invoice.items.map(item => `<tr><td>${escapeHtml(item.product.name)}</td><td>${escapeHtml(item.product.id)}</td><td>${item.qty}</td><td>${money(currentPrice(item.product))}</td><td>${money(item.subtotal)}</td></tr>`).join("")}</tbody></table>
+    <div class="invoice-grand-total"><span>Grand total</span><b>${money(invoice.total)}</b></div>`;
+}
+function saveLocalOrderAndDeductStock(invoice) {
+  if (invoice.stockCommitted) return true;
+  const unavailable = invoice.items.find(item => {
+    const product = products.find(entry => entry.id === item.product.id);
+    return !product || Number(product.stock) < Number(item.qty);
+  });
+  if (unavailable) {
+    alert(`Not enough stock for ${unavailable.product.name}. Please adjust the cart.`);
+    return false;
+  }
+  const savedStock = readJson(LOCAL_STOCK_KEY, {});
+  invoice.items.forEach(item => {
+    const product = products.find(entry => entry.id === item.product.id);
+    const remaining = Math.max(0, Number(product.stock) - Number(item.qty));
+    product.stock = remaining;
+    item.product.stock = remaining;
+    savedStock[product.id] = remaining;
+  });
+  localStorage.setItem(LOCAL_STOCK_KEY, JSON.stringify(savedStock));
+  const orders = readJson(LOCAL_ORDERS_KEY, []);
+  orders.push({
+    number: invoice.number,
+    date: invoice.date,
+    customer: invoice.customer,
+    customerType: invoice.customerType,
+    total: invoice.total,
+    items: invoice.items.map(item => ({ id: item.product.id, name: item.product.name, qty: item.qty, subtotal: item.subtotal }))
+  });
+  localStorage.setItem(LOCAL_ORDERS_KEY, JSON.stringify(orders));
+  invoice.stockCommitted = true;
+  renderProducts();
+  return true;
+}
+function sendInvoiceWhatsApp() {
+  if (!currentInvoice) return;
+  const invoice = currentInvoice;
+  if (!saveLocalOrderAndDeductStock(invoice)) return;
+  const message = ["PET UNLEASH INVOICE", `Invoice No: ${invoice.number}`, `Date: ${invoice.date}`, `Customer type: ${invoice.customerType}`, `Deliver to: ${invoice.customer.name}`, `Phone: ${invoice.customer.phone}`, invoice.customer.address ? `Address: ${invoice.customer.address}` : "", "", ...invoice.items.map(item => `${item.product.name} (${item.product.id}) x${item.qty} = ${money(item.subtotal)}`), "", `TOTAL: ${money(invoice.total)}`].filter(Boolean).join("\n");
+  cart = [];
+  saveCart();
+  closeInvoice();
+  window.open(`https://wa.me/${PHONE}?text=${encodeURIComponent(message)}`, "_blank");
+}
+function setCategory(category) {
+  activeCategory = category;
+  document.querySelector("#shop").hidden = false;
+  document.querySelector("#productHeading").textContent = category === "ALL" ? "Featured Products" : category;
+  renderProducts();
+}
+function openDepartment(department) {
+  const cardDepartment = department === "Dogs" ? "Dog Accessories" : department === "Cats" ? "Cat Accessories" : department;
+  const cards = departmentCards[cardDepartment];
+  if (!cards) { setCategory(department); document.querySelector("#shop").scrollIntoView({behavior:"smooth"}); return; }
+  document.querySelector("#breadcrumb").textContent = `Pet Unleash / ${department}`;
+  document.querySelector("#departmentTitle").textContent = department;
+  const grid = document.querySelector("#subcategoryGrid");
+  grid.innerHTML = cards.map(([name]) => {
+    const image = categoryImages[cardDepartment][name];
+    return `<button class="subcategory" style="background-image:url('assets/categories/${image}.png')" onclick="openSubcategory('${name}')"><b>${name}</b></button>`;
+  }).join("");
+  document.querySelector("#subcategories").hidden = false;
+  document.querySelector("#subcategories").scrollIntoView({behavior:"smooth",block:"start"});
+}
+function openSubcategory(category) { setCategory(category); document.querySelector("#shop").scrollIntoView({behavior:"smooth"}); }
+function showAllProducts() { document.querySelector("#subcategories").hidden = true; setCategory("ALL"); document.querySelector("#shop").scrollIntoView({behavior:"smooth"}); }
+function showHome() { document.querySelector("#subcategories").hidden = true; document.querySelector("#shop").hidden = true; activeCategory = "ALL"; document.querySelector("#top").scrollIntoView({behavior:"smooth"}); }
+function openWholesaleLogin() { document.querySelector("#wholesaleModal").classList.add("open"); }
+function closeWholesaleLogin() { document.querySelector("#wholesaleModal").classList.remove("open"); }
+function wholesaleLogin() { const user = document.querySelector("#whUser").value.trim(); const password = document.querySelector("#whPass").value; if (user === "dealer" && password === "wholesale") { localStorage.setItem(ROLE_KEY, "wholesale"); closeWholesaleLogin(); renderProducts(); renderCart(); alert("Wholesale prices activated."); } else alert("Wrong wholesale login."); }
+function logoutWholesale() { localStorage.setItem(ROLE_KEY, "retail"); renderProducts(); renderCart(); }
+document.addEventListener("input", event => { if (event.target.matches("#search,#foodType")) renderProducts(); });
+document.addEventListener("change", event => { if (event.target.matches("#foodType")) renderProducts(); });
+document.addEventListener("DOMContentLoaded", async () => { products = await getProducts(); renderProducts(); updateCartCount(); });
