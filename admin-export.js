@@ -1,8 +1,103 @@
-function getAdminExportProducts(filtered = false) {
+let activeAdminBrandFilter = "";
+
+function normalizeAdminBrand(value) {
+  return String(value || "").trim().toUpperCase();
+}
+
+function getAdminVisibleProducts() {
+  const q = (window.adminSearch?.value || "").trim().toLowerCase();
+  const brand = normalizeAdminBrand(activeAdminBrandFilter);
+  return products.filter(p => {
+    const brandMatch = !brand || normalizeAdminBrand(p.brand) === brand;
+    const searchMatch = !q || `${p.id} ${p.barcode} ${p.name} ${p.brand} ${p.category}`.toLowerCase().includes(q);
+    return brandMatch && searchMatch;
+  });
+}
+
+function setAdminBrandFilter(brand = "") {
+  activeAdminBrandFilter = normalizeAdminBrand(brand);
+  document.querySelectorAll("#brandQuickFilters button[data-brand]").forEach(button => {
+    const selected = normalizeAdminBrand(button.dataset.brand) === activeAdminBrandFilter;
+    button.classList.toggle("btn-primary", selected);
+    button.classList.toggle("btn-soft", !selected);
+  });
+  window.render();
+}
+
+function updateAdminBrandCounts() {
+  const counts = products.reduce((acc, product) => {
+    const brand = normalizeAdminBrand(product.brand) || "OTHER";
+    acc[brand] = (acc[brand] || 0) + 1;
+    return acc;
+  }, {});
+  const allButton = document.querySelector('#brandQuickFilters button[data-brand=""]');
+  const trixieButton = document.querySelector('#brandQuickFilters button[data-brand="TRIXIE"]');
+  const bioformButton = document.querySelector('#brandQuickFilters button[data-brand="BIOFORM"]');
+  if (allButton) allButton.textContent = `All (${products.length})`;
+  if (trixieButton) trixieButton.textContent = `TRIXIE (${counts.TRIXIE || 0})`;
+  if (bioformButton) bioformButton.textContent = `BIOFORM (${counts.BIOFORM || 0})`;
+}
+
+function installAdminBrandTools() {
+  const search = document.getElementById("adminSearch");
+  const exportActions = document.querySelector(".export-actions");
+  const headRow = document.querySelector(".table-wrap thead tr");
+
+  if (headRow) {
+    headRow.innerHTML = '<th>Image</th><th>Item Code</th><th>Product</th><th>Brand</th><th>Retail</th><th>Wholesale</th><th>Stock</th><th></th>';
+  }
+
+  if (search && !document.getElementById("brandQuickFilters")) {
+    const filters = document.createElement("div");
+    filters.id = "brandQuickFilters";
+    filters.style.cssText = "display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 12px";
+    filters.innerHTML = `
+      <strong style="margin-right:2px">Brand:</strong>
+      <button type="button" class="btn btn-primary" data-brand="" onclick="setAdminBrandFilter('')">All</button>
+      <button type="button" class="btn btn-soft" data-brand="TRIXIE" onclick="setAdminBrandFilter('TRIXIE')">TRIXIE</button>
+      <button type="button" class="btn btn-soft" data-brand="BIOFORM" onclick="setAdminBrandFilter('BIOFORM')">BIOFORM</button>
+    `;
+    search.insertAdjacentElement("afterend", filters);
+  }
+
+  if (exportActions && !document.getElementById("exportTrixieBtn")) {
+    exportActions.insertAdjacentHTML("beforeend", `
+      <button id="exportTrixieBtn" class="btn btn-soft" onclick="exportProducts(false,'TRIXIE')">📦 Export TRIXIE Excel</button>
+      <button id="exportBioformBtn" class="btn btn-soft" onclick="exportProducts(false,'BIOFORM')">🐾 Export BIOFORM Excel</button>
+    `);
+  }
+
+  updateAdminBrandCounts();
+}
+
+window.render = function renderAdminProducts() {
+  statProducts.textContent = products.length;
+  statLow.textContent = products.filter(p => p.stock <= 5).length;
+  statStock.textContent = products.reduce((a, p) => a + p.stock, 0);
+
+  const list = getAdminVisibleProducts();
+  rows.innerHTML = list.map(p => `<tr>
+    <td>${p.image ? `<img class="thumb" src="${p.image}" loading="lazy" onerror="this.replaceWith(document.createTextNode('🐾'))">` : "🐾"}</td>
+    <td>${p.id}</td>
+    <td><b>${p.name}</b><br><small>${p.category}</small></td>
+    <td><b>${p.brand || ""}</b></td>
+    <td>${p.retail.toFixed(2)}</td>
+    <td>${p.wholesale.toFixed(2)}</td>
+    <td>${p.stock}</td>
+    <td><button class="btn btn-soft" onclick="openEditor('${p.id}')">Edit</button> <button class="btn btn-soft" onclick="removeProduct('${p.id}')">Delete</button></td>
+  </tr>`).join("");
+  updateAdminBrandCounts();
+};
+
+function getAdminExportProducts(filtered = false, brandOverride = "") {
   const q = filtered ? (window.adminSearch?.value || "").trim().toLowerCase() : "";
-  const list = !q
-    ? [...products]
-    : products.filter(p => `${p.id} ${p.barcode} ${p.name} ${p.brand} ${p.category}`.toLowerCase().includes(q));
+  const brand = normalizeAdminBrand(brandOverride || (filtered ? activeAdminBrandFilter : ""));
+
+  const list = products.filter(p => {
+    const brandMatch = !brand || normalizeAdminBrand(p.brand) === brand;
+    const searchMatch = !q || `${p.id} ${p.barcode} ${p.name} ${p.brand} ${p.category}`.toLowerCase().includes(q);
+    return brandMatch && searchMatch;
+  });
 
   return list.sort((a, b) => String(a.id || "").localeCompare(String(b.id || ""), "en", { numeric: false, sensitivity: "base" }));
 }
@@ -57,19 +152,24 @@ function downloadWorkbookBlob(buffer, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-async function exportProducts(filtered = false) {
+window.exportProducts = async function exportProducts(filtered = false, brandOverride = "") {
   if (!window.ExcelJS) {
     alert("Excel export is still loading. Please try again in a moment.");
     return;
   }
 
-  const list = getAdminExportProducts(filtered);
+  const list = getAdminExportProducts(filtered, brandOverride);
   if (!list.length) {
     alert("No products to export.");
     return;
   }
 
-  const buttonId = filtered ? "exportFilteredBtn" : "exportAllBtn";
+  const brand = normalizeAdminBrand(brandOverride || (filtered ? activeAdminBrandFilter : ""));
+  const buttonId = brandOverride === "TRIXIE"
+    ? "exportTrixieBtn"
+    : brandOverride === "BIOFORM"
+      ? "exportBioformBtn"
+      : filtered ? "exportFilteredBtn" : "exportAllBtn";
   const button = document.getElementById(buttonId);
   const originalText = button?.textContent || "";
   if (button) {
@@ -82,7 +182,8 @@ async function exportProducts(filtered = false) {
     workbook.creator = "Sojepharm Admin";
     workbook.created = new Date();
 
-    const sheet = workbook.addWorksheet("Price List", {
+    const sheetName = brand ? `${brand} Price List`.slice(0, 31) : "Price List";
+    const sheet = workbook.addWorksheet(sheetName, {
       views: [{ state: "frozen", ySplit: 1 }]
     });
 
@@ -164,8 +265,9 @@ async function exportProducts(filtered = false) {
     sheet.getColumn(10).alignment = { vertical: "middle", horizontal: "center" };
 
     const date = new Date().toISOString().slice(0, 10);
-    const suffix = filtered && (window.adminSearch?.value || "").trim() ? "-Filtered" : "";
-    const filename = `Sojepharm-Price-List${suffix}-${date}.xlsx`;
+    const brandSuffix = brand ? `-${brand}` : "";
+    const filterSuffix = filtered && (window.adminSearch?.value || "").trim() ? "-Filtered" : "";
+    const filename = `Sojepharm${brandSuffix}-Price-List${filterSuffix}-${date}.xlsx`;
     const buffer = await workbook.xlsx.writeBuffer();
     downloadWorkbookBlob(buffer, filename);
 
@@ -182,4 +284,8 @@ async function exportProducts(filtered = false) {
       button.textContent = originalText;
     }
   }
-}
+};
+
+window.setAdminBrandFilter = setAdminBrandFilter;
+
+document.addEventListener("DOMContentLoaded", installAdminBrandTools);
