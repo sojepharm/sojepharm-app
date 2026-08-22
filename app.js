@@ -45,7 +45,9 @@ function classifyProduct(item) {
   return /cat/.test(text) ? "Cat Accessories" : "Dog Accessories";
 }
 
-const role = () => localStorage.getItem(ROLE_KEY) || "retail";
+// Wholesale access is session-only. A normal/new visit always starts as Retail,
+// instead of remembering Wholesale forever on that phone/browser.
+const role = () => sessionStorage.getItem(ROLE_KEY) || "retail";
 const money = value => `${Number(value || 0).toFixed(2)} USD`;
 const escapeHtml = value => String(value ?? "").replace(/[&<>'\"]/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[char]));
 const isConfigured = () => window.PET_UNLEASH_SUPABASE_ANON_KEY && !window.PET_UNLEASH_SUPABASE_ANON_KEY.startsWith("PASTE_");
@@ -250,8 +252,14 @@ function showAllProducts() { document.querySelector("#subcategories").hidden = t
 function showHome() { document.querySelector("#subcategories").hidden = true; document.querySelector("#shop").hidden = true; activeCategory = "ALL"; document.querySelector("#top").scrollIntoView({behavior:"smooth"}); }
 function openWholesaleLogin() { document.querySelector("#wholesaleModal").classList.add("open"); }
 function closeWholesaleLogin() { document.querySelector("#wholesaleModal").classList.remove("open"); }
-function wholesaleLogin() { const user = document.querySelector("#whUser").value.trim(); const password = document.querySelector("#whPass").value; if (user === "dealer" && password === "wholesale") { localStorage.setItem(ROLE_KEY, "wholesale"); closeWholesaleLogin(); renderProducts(); renderCart(); alert("Wholesale prices activated."); } else alert("Wrong wholesale login."); }
-function logoutWholesale() { localStorage.setItem(ROLE_KEY, "retail"); renderProducts(); renderCart(); }
+function wholesaleLogin() { const user = document.querySelector("#whUser").value.trim(); const password = document.querySelector("#whPass").value; if (user === "dealer" && password === "wholesale") { sessionStorage.setItem(ROLE_KEY, "wholesale"); closeWholesaleLogin(); renderProducts(); renderCart(); alert("Wholesale prices activated for this browsing session."); } else alert("Wrong wholesale login."); }
+function logoutWholesale() { sessionStorage.removeItem(ROLE_KEY); renderProducts(); renderCart(); }
 document.addEventListener("input", event => { if (event.target.matches("#search,#foodType")) renderProducts(); });
 document.addEventListener("change", event => { if (event.target.matches("#foodType")) renderProducts(); });
-document.addEventListener("DOMContentLoaded", async () => { products = await getProducts(); renderProducts(); updateCartCount(); });
+document.addEventListener("DOMContentLoaded", async () => {
+  // Remove the old persistent role once so phones previously left in Wholesale do not stay stuck there.
+  localStorage.removeItem(ROLE_KEY);
+  products = await getProducts();
+  renderProducts();
+  updateCartCount();
+});
