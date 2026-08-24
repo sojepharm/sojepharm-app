@@ -101,7 +101,8 @@ function normalizeProduct(item) {
 async function getProducts() {
   const client = db();
   if (client) {
-    const { data, error } = await client.rpc("get_storefront_products");
+    const source = role() === "wholesale" ? "wholesale_storefront_products" : "retail_storefront_products";
+    const { data, error } = await client.from(source).select("item_code,barcode,name,brand,category,description,wholesale,retail,stock,image_url,active").order("name");
     if (!error) return applyLocalStock(data.map(normalizeProduct));
     console.warn("Could not load storefront products from Supabase", error.message);
   }
