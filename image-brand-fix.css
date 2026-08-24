@@ -1,0 +1,63 @@
+/* Keep every product photo fully visible inside a consistent card. */
+.image-wrap {
+  height: 230px;
+  padding: 18px;
+  background: #fff;
+}
+
+.image-wrap img {
+  display: block;
+  width: auto !important;
+  height: auto !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  object-fit: contain !important;
+  object-position: center !important;
+}
+
+.brand-list span,
+.brand-filter {
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.brand-filter {
+  border: 1px solid #d8dee8;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--navy);
+  padding: 10px 16px;
+  transition: 0.15s ease;
+}
+
+.brand-filter:hover,
+.brand-filter:focus-visible {
+  background: var(--navy);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.empty-products {
+  grid-column: 1 / -1;
+  padding: 30px;
+  text-align: center;
+  color: var(--muted);
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+}
+
+@media (max-width: 850px) {
+  .image-wrap {
+    height: 170px;
+    padding: 12px;
+  }
+
+  .brand-list {
+    justify-content: center;
+  }
+
+  .brand-list span,
+  .brand-filter {
+    font-size: 14px;
+  }
+}
