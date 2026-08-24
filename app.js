@@ -9,6 +9,8 @@ let products = [];
 let cart = JSON.parse(localStorage.getItem(CART_KEY) || "[]");
 let activeCategory = "ALL";
 let currentInvoice = null;
+let currentRole = "retail";
+let supabaseClient = null;
 
 const departmentCards = {
   "Dog Accessories": [
@@ -45,13 +47,28 @@ function classifyProduct(item) {
   return /cat/.test(text) ? "Cat Accessories" : "Dog Accessories";
 }
 
-// Wholesale access is session-only. A normal/new visit always starts as Retail,
-// instead of remembering Wholesale forever on that phone/browser.
-const role = () => sessionStorage.getItem(ROLE_KEY) || "retail";
+const role = () => currentRole;
 const money = value => `${Number(value || 0).toFixed(2)} USD`;
 const escapeHtml = value => String(value ?? "").replace(/[&<>'\"]/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[char]));
 const isConfigured = () => window.PET_UNLEASH_SUPABASE_ANON_KEY && !window.PET_UNLEASH_SUPABASE_ANON_KEY.startsWith("PASTE_");
-const db = () => isConfigured() && window.supabase ? window.supabase.createClient(window.PET_UNLEASH_SUPABASE_URL, window.PET_UNLEASH_SUPABASE_ANON_KEY) : null;
+function db() {
+  if (!isConfigured() || !window.supabase) return null;
+  if (!supabaseClient) {
+    supabaseClient = window.supabase.createClient(
+      window.PET_UNLEASH_SUPABASE_URL,
+      window.PET_UNLEASH_SUPABASE_ANON_KEY,
+      {
+        auth: {
+          storage: window.sessionStorage,
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: false
+        }
+      }
+    );
+  }
+  return supabaseClient;
+}
 
 function readJson(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); }
@@ -73,7 +90,7 @@ function normalizeProduct(item) {
     name: item.name || "",
     category: item.category || classifyProduct(item),
     description: item.description || "",
-    wholesale: Number(item.wholesale || 0),
+    wholesale: item.wholesale == null ? null : Number(item.wholesale),
     retail: Number(item.retail || 0),
     stock: Number(item.stock || 0),
     image: item.image_url || item.image || "",
@@ -84,9 +101,9 @@ function normalizeProduct(item) {
 async function getProducts() {
   const client = db();
   if (client) {
-    const { data, error } = await client.from("products").select("item_code,barcode,name,brand,category,description,wholesale,retail,stock,image_url,active").eq("active", true).order("name");
+    const { data, error } = await client.rpc("get_storefront_products");
     if (!error) return applyLocalStock(data.map(normalizeProduct));
-    console.warn("Could not load products from Supabase", error.message);
+    console.warn("Could not load storefront products from Supabase", error.message);
   }
   if (Array.isArray(window.PET_UNLEASH_LOCAL_PRODUCTS)) return applyLocalStock(window.PET_UNLEASH_LOCAL_PRODUCTS.map(normalizeProduct));
   const base = await fetch("data.json").then(response => response.json());
@@ -252,13 +269,67 @@ function showAllProducts() { document.querySelector("#subcategories").hidden = t
 function showHome() { document.querySelector("#subcategories").hidden = true; document.querySelector("#shop").hidden = true; activeCategory = "ALL"; document.querySelector("#top").scrollIntoView({behavior:"smooth"}); }
 function openWholesaleLogin() { document.querySelector("#wholesaleModal").classList.add("open"); }
 function closeWholesaleLogin() { document.querySelector("#wholesaleModal").classList.remove("open"); }
-function wholesaleLogin() { const user = document.querySelector("#whUser").value.trim(); const password = document.querySelector("#whPass").value; if (user === "dealer" && password === "wholesale") { sessionStorage.setItem(ROLE_KEY, "wholesale"); closeWholesaleLogin(); renderProducts(); renderCart(); alert("Wholesale prices activated for this browsing session."); } else alert("Wrong wholesale login."); }
-function logoutWholesale() { sessionStorage.removeItem(ROLE_KEY); renderProducts(); renderCart(); }
+function normalizeLebanonPhone(value) {
+  const raw = String(value || "").trim().replace(/[\s().-]/g, "");
+  if (!raw) return "";
+  if (raw.startsWith("+")) return raw;
+  if (raw.startsWith("00")) return `+${raw.slice(2)}`;
+  if (raw.startsWith("961")) return `+${raw}`;
+  if (raw.startsWith("0")) return `+961${raw.slice(1)}`;
+  return `+961${raw}`;
+}
+function clearWholesaleFields() {
+  document.querySelector("#whUser").value = "";
+  document.querySelector("#whPass").value = "";
+}
+async function isWholesaleAuthorized(client) {
+  const { data, error } = await client.rpc("is_wholesale_customer");
+  return !error && data === true;
+}
+async function refreshStorefront() {
+  products = await getProducts();
+  renderProducts();
+  renderCart();
+}
+async function initializeWholesaleSession() {
+  const client = db();
+  if (!client) return;
+  const { data } = await client.auth.getSession();
+  if (data.session && await isWholesaleAuthorized(client)) currentRole = "wholesale";
+  else if (data.session) await client.auth.signOut({ scope: "local" });
+}
+async function wholesaleLogin(event) {
+  event?.preventDefault();
+  const client = db();
+  const phone = normalizeLebanonPhone(document.querySelector("#whUser").value);
+  const password = document.querySelector("#whPass").value;
+  if (!client) return alert("Login service is temporarily unavailable.");
+  if (!phone || !password) return alert("Enter phone number and password.");
+  const { error } = await client.auth.signInWithPassword({ phone, password });
+  if (error || !await isWholesaleAuthorized(client)) {
+    await client.auth.signOut({ scope: "local" });
+    currentRole = "retail";
+    document.querySelector("#whPass").value = "";
+    return alert("Phone number or password is incorrect, or this wholesale account is inactive.");
+  }
+  currentRole = "wholesale";
+  clearWholesaleFields();
+  await refreshStorefront();
+  closeWholesaleLogin();
+  alert("Wholesale prices activated until this tab is closed.");
+}
+async function logoutWholesale() {
+  const client = db();
+  if (client) await client.auth.signOut({ scope: "local" });
+  currentRole = "retail";
+  clearWholesaleFields();
+  await refreshStorefront();
+}
 document.addEventListener("input", event => { if (event.target.matches("#search,#foodType")) renderProducts(); });
 document.addEventListener("change", event => { if (event.target.matches("#foodType")) renderProducts(); });
 document.addEventListener("DOMContentLoaded", async () => {
-  // Remove the old persistent role once so phones previously left in Wholesale do not stay stuck there.
   localStorage.removeItem(ROLE_KEY);
+  await initializeWholesaleSession();
   products = await getProducts();
   renderProducts();
   updateCartCount();
