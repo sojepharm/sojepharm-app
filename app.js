@@ -10,6 +10,7 @@ let products = [];
 let cart = JSON.parse(localStorage.getItem(CART_KEY) || "[]");
 let activeCategory = "ALL";
 let activeBrand = "ALL";
+let activeDepartment = "ALL";
 let currentInvoice = null;
 let currentRole = "retail";
 let supabaseClient = null;
@@ -207,17 +208,37 @@ function filtered() {
   return products.filter(product => product.active !== false)
     .filter(product => activeBrand === "ALL" || String(product.brand).toUpperCase() === activeBrand)
     .filter(product => foodType === "ALL" || product.category === foodType)
-    .filter(product => category === "ALL" || categoryMatches(product.category, category))
+    .filter(product => category === "ALL" || categoryMatches(product, category))
     .filter(product => `${product.id} ${product.barcode} ${product.name} ${product.brand}`.toLowerCase().includes(query))
     .sort(brandProductOrder);
 }
-function categoryMatches(productCategory, selectedCategory) {
+function productAudience(product) {
+  const category = String(product.category || "").toLowerCase();
+  const text = `${product.name || ""} ${product.description || ""}`.toLowerCase();
+  if (category.includes("cat")) return "cat";
+  if (category.includes("dog")) return "dog";
+  if (category === "both") return "both";
+  if (/\b(cat|kitten|feline|catnip|matatabi|litter|scratching)\b/.test(text)) return "cat";
+  if (/\b(dog|puppy|canine)\b/.test(text)) return "dog";
+  return "both";
+}
+function categoryMatches(product, selectedCategory) {
+  const productCategory = product.category;
+  const audience = productAudience(product);
+  const wantedAudience = activeDepartment === "Cats" ? "cat" : activeDepartment === "Dogs" ? "dog" : "both";
+  const audienceMatches = wantedAudience === "both" || audience === wantedAudience || audience === "both";
+  if (!audienceMatches) return false;
   if (productCategory === selectedCategory) return true;
-  if (selectedCategory === "Bowls & Water Bottles" && productCategory === "Bowls") return true;
-  if (selectedCategory === "Transport & Travel" && productCategory === "Pet Voyager") return true;
-  if (selectedCategory === "Toys for Cats" && productCategory === "Toys") return true;
-  if (selectedCategory === "Cat Litter Tray" && productCategory === "Cat Litter") return true;
-  if ((selectedCategory === "Dog Snacks" || selectedCategory === "Cat Snacks") && productCategory === "Treats") return true;
+  const group = brandGroup(product);
+  if (selectedCategory === "Bowls & Water Bottles") return group === "Bowls";
+  if (selectedCategory === "Transport & Travel") return group === "Pet Voyager";
+  if (selectedCategory === "Toys" || selectedCategory === "Toys for Cats") return group === "Toys";
+  if (selectedCategory === "Cat Litter Tray") return group === "Hygiene & Care" && /litter|toilet/.test(`${product.name} ${product.description}`.toLowerCase());
+  if (selectedCategory === "Dog Snacks" || selectedCategory === "Cat Snacks") return group === "Treats";
+  if (selectedCategory === "Hygiene & Care") return group === "Hygiene & Care";
+  if (selectedCategory === "At Home") return group === "At Home";
+  if (selectedCategory === "Leads, Collars & Harnesses") return group === "Leads, Collars & Harnesses";
+  if (selectedCategory === "Dog Beds & Resting Places" || selectedCategory === "Cat Beds & Resting Places") return /Beds & Resting Places$/.test(group);
   const dog = ["Dog Beds & Resting Places", "Leads, Collars & Harnesses", "Toys", "Dog Snacks", "Bowls", "At Home", "Pet Voyager", "Hygiene & Care"];
   const cat = ["Cat Beds & Resting Places", "Leads, Collars & Harnesses", "Toys", "Cat Snacks", "Bowls", "At Home", "Pet Voyager", "Hygiene & Care"];
   if (selectedCategory === "Dogs") return productCategory === "Dog Food" || productCategory === "Dog Accessories" || productCategory === "Treats" || dog.includes(productCategory);
@@ -353,6 +374,7 @@ function setCategory(category) {
   renderProducts();
 }
 function openDepartment(department) {
+  activeDepartment = department;
   const cardDepartment = department === "Dogs" ? "Dog Accessories" : department === "Cats" ? "Cat Accessories" : department;
   const cards = departmentCards[cardDepartment];
   if (!cards) { setCategory(department); document.querySelector("#shop").scrollIntoView({behavior:"smooth"}); return; }
@@ -367,8 +389,9 @@ function openDepartment(department) {
   document.querySelector("#subcategories").scrollIntoView({behavior:"smooth",block:"start"});
 }
 function openSubcategory(category) { setCategory(category); document.querySelector("#shop").scrollIntoView({behavior:"smooth"}); }
-function showAllProducts() { document.querySelector("#subcategories").hidden = true; setCategory("ALL"); document.querySelector("#shop").scrollIntoView({behavior:"smooth"}); }
+function showAllProducts() { activeDepartment = "ALL"; document.querySelector("#subcategories").hidden = true; setCategory("ALL"); document.querySelector("#shop").scrollIntoView({behavior:"smooth"}); }
 function showBrandProducts(brand) {
+  activeDepartment = "ALL";
   activeCategory = "ALL";
   activeBrand = String(brand || "").toUpperCase();
   document.querySelector("#subcategories").hidden = true;
@@ -379,7 +402,7 @@ function showBrandProducts(brand) {
   renderProducts();
   document.querySelector("#shop").scrollIntoView({behavior:"smooth"});
 }
-function showHome() { document.querySelector("#subcategories").hidden = true; document.querySelector("#shop").hidden = true; activeCategory = "ALL"; activeBrand = "ALL"; document.querySelector("#top").scrollIntoView({behavior:"smooth"}); }
+function showHome() { document.querySelector("#subcategories").hidden = true; document.querySelector("#shop").hidden = true; activeCategory = "ALL"; activeBrand = "ALL"; activeDepartment = "ALL"; document.querySelector("#top").scrollIntoView({behavior:"smooth"}); }
 function openWholesaleLogin() { document.querySelector("#wholesaleModal").classList.add("open"); }
 function closeWholesaleLogin() { document.querySelector("#wholesaleModal").classList.remove("open"); }
 function normalizeLebanonPhone(value) {
