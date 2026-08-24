@@ -381,6 +381,10 @@ async function sendInvoiceWhatsApp() {
 function setCategory(category) {
   activeBrand = "ALL";
   activeCategory = category;
+  const foodType = document.querySelector("#foodType");
+  const search = document.querySelector("#search");
+  if (foodType) foodType.value = "ALL";
+  if (search) search.value = "";
   document.querySelector("#shop").hidden = false;
   document.querySelector("#productHeading").textContent = category === "ALL" ? "Featured Products" : category;
   renderProducts();
