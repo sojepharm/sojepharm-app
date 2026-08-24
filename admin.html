@@ -1,11 +1,13 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pet Unleash Admin</title><link rel="stylesheet" href="styles.css"><style>.product-form{display:grid;grid-template-columns:1fr 1fr;gap:12px}.product-form .full{grid-column:1/-1}.preview{height:180px;border:1px dashed #bbb;border-radius:14px;display:grid;place-items:center;overflow:hidden;background:#fff}.preview img{max-width:100%;max-height:100%;object-fit:contain}.thumb{width:64px;height:64px;object-fit:contain;border:1px solid #ddd;border-radius:10px;background:#fff}.field-with-camera{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:start}
 .field-with-camera textarea{min-height:110px}.camera-btn{white-space:nowrap}
-.admin-search{width:min(520px,100%);margin:14px 0}.ocr-status{font-size:13px;color:#666;margin-top:6px}.export-actions{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}
+.admin-search{width:min(520px,100%);margin:14px 0}.ocr-status{font-size:13px;color:#666;margin-top:6px}.export-actions{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}.admin-section{margin:22px 0;padding:18px;background:#fff;border:1px solid #e5e7eb;border-radius:16px}.admin-section h2{margin:0 0 12px}.admin-section small{color:#666}.cart-products{max-width:340px;white-space:normal}.status-pill{display:inline-block;padding:4px 8px;border-radius:999px;background:#eef2ff;font-size:12px}.status-pill.verified{background:#dcfce7}.live-dot{color:#16a34a}
 @media(max-width:700px){.product-form{grid-template-columns:1fr}.field-with-camera{grid-template-columns:1fr}.camera-btn{width:100%}.admin-toolbar>div{display:flex;gap:8px;flex-wrap:wrap}.export-actions .btn{flex:1 1 180px}}</style></head>
 <body><header><div class="nav"><a class="logo" href="index.html"><span class="logo-mark">P</span>Pet Unleash</a><div class="nav-actions"><a class="btn btn-soft" href="index.html">View Shop</a></div></div></header>
 <div id="loginBox" class="login"><h1>Admin Login</h1><input id="adminEmail" type="email" placeholder="Admin email" style="margin-bottom:12px"><input id="adminPass" type="password" placeholder="Password" style="margin-bottom:12px"><button class="btn btn-primary" style="width:100%" onclick="login()">Login</button></div>
 <main id="adminApp" class="admin-shell" style="display:none"><div class="admin-toolbar"><h1>Admin Dashboard</h1><div><button class="btn btn-soft" onclick="startScanner()">📷 Scan Item</button> <button class="btn btn-accent" onclick="openEditor()">➕ Add Product</button></div></div><div class="admin-grid"><div class="stat">Products<b id="statProducts">0</b></div><div class="stat">Low stock<b id="statLow">0</b></div><div class="stat">Stock units<b id="statStock">0</b></div></div><div class="notice">Scan an existing barcode to open its full product record. For a brand-new barcode, the form opens ready to save its details.</div>
+<section class="admin-section"><div class="admin-toolbar"><div><h2>Wholesale Registrations</h2><small>Send the verification code manually on WhatsApp.</small></div><button class="btn btn-soft" onclick="loadWholesaleRegistrations()">Refresh</button></div><div class="table-wrap"><table><thead><tr><th>Customer</th><th>Shop</th><th>WhatsApp</th><th>Code</th><th>Status</th><th></th></tr></thead><tbody id="registrationRows"><tr><td colspan="6">Loading…</td></tr></tbody></table></div></section>
+<section class="admin-section"><div class="admin-toolbar"><div><h2><span class="live-dot">●</span> Live Carts</h2><small>Guest carts appear before the customer sends the order.</small></div><button class="btn btn-soft" onclick="loadLiveCarts()">Refresh</button></div><div class="table-wrap"><table><thead><tr><th>Visitor</th><th>Contact</th><th>Products</th><th>Total</th><th>Status</th><th>Last activity</th></tr></thead><tbody id="liveCartRows"><tr><td colspan="6">Loading…</td></tr></tbody></table></div></section>
 <input id="adminSearch" class="admin-search" placeholder="Search item code, barcode, product or brand" oninput="render()"><div class="export-actions"><button id="exportAllBtn" class="btn btn-primary" onclick="exportProducts(false)">📊 Export All to Excel</button><button id="exportFilteredBtn" class="btn btn-soft" onclick="exportProducts(true)">📋 Export Filtered to Excel</button></div><div class="table-wrap"><table><thead><tr><th>Image</th><th>Item Code</th><th>Product</th><th>Retail</th><th>Wholesale</th><th>Stock</th><th></th></tr></thead><tbody id="rows"></tbody></table></div></main>
 <div id="editorModal" class="modal"><div class="modal-card" style="max-width:760px"><div class="modal-head"><h2 id="editorTitle">Add Product</h2><button class="icon-btn" onclick="closeEditor()">×</button></div><div class="modal-body"><div class="product-form">
 <div class="field-with-camera"><input id="fId" placeholder="Item code"><button type="button" class="btn btn-soft camera-btn" onclick="captureText('item')">📷 Item Code</button></div>
@@ -21,10 +23,36 @@
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://unpkg.com/@zxing/browser@latest"></script>
 <script src="supabase-config.js"></script><script>
-const client=window.supabase.createClient(window.PET_UNLEASH_SUPABASE_URL,window.PET_UNLEASH_SUPABASE_ANON_KEY);let products=[],editingCode=null,pendingImage="",pendingFile=null,stream=null,detector=null;
+const client=window.supabase.createClient(window.PET_UNLEASH_SUPABASE_URL,window.PET_UNLEASH_SUPABASE_ANON_KEY);let products=[],registrations=[],liveCarts=[],editingCode=null,pendingImage="",pendingFile=null,stream=null,detector=null;
+const adminEscape=value=>String(value??"").replace(/[&<>'"]/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[char]));
 const normalize=p=>({id:p.item_code,barcode:p.barcode||"",name:p.name||"",description:p.description||"",ingredients:p.ingredients||"",brand:p.brand||"TRIXIE",category:p.category||"Accessories",wholesale:Number(p.wholesale||0),retail:Number(p.retail||0),stock:Number(p.stock||0),image:p.image_url||"",active:p.active!==false});
-async function login(){const {error}=await client.auth.signInWithPassword({email:adminEmail.value.trim(),password:adminPass.value});if(error)return alert("Login failed. Check your admin email and password.");loginBox.style.display="none";adminApp.style.display="block";await loadProducts()}
+async function login(){const {error}=await client.auth.signInWithPassword({email:adminEmail.value.trim(),password:adminPass.value});if(error)return alert("Login failed. Check your admin email and password.");loginBox.style.display="none";adminApp.style.display="block";await Promise.all([loadProducts(),loadWholesaleRegistrations(),loadLiveCarts()])}
 async function loadProducts(){const {data,error}=await client.from("products").select("*").order("name");if(error)return alert(error.message);products=data.map(normalize);render()}
+async function loadWholesaleRegistrations(){
+  const {data,error}=await client.from("wholesale_registrations").select("*").order("created_at",{ascending:false}).limit(100);
+  if(error){registrationRows.innerHTML=`<tr><td colspan="6">${adminEscape(error.message)}</td></tr>`;return}
+  registrations=data||[];
+  registrationRows.innerHTML=registrations.length?registrations.map(r=>`<tr><td><b>${adminEscape(r.customer_name)}</b><br><small>${adminEscape(r.address||"")}</small></td><td>${adminEscape(r.shop_name)}</td><td>${adminEscape(r.phone)}</td><td><b>${r.verified_at?"—":adminEscape(r.verification_code)}</b></td><td><span class="status-pill ${r.verified_at?"verified":""}">${r.verified_at?"Verified":"Waiting for code"}</span></td><td>${r.verified_at?"":`<button class="btn btn-primary" onclick="sendRegistrationCode('${r.id}')">WhatsApp Code</button>`}</td></tr>`).join(""):'<tr><td colspan="6">No registrations yet.</td></tr>';
+}
+function sendRegistrationCode(id){
+  const r=registrations.find(item=>item.id===id);if(!r||r.verified_at)return;
+  const phone=r.phone.replace(/\D/g,"");
+  const message=`Hello ${r.customer_name}, your Pet Unleash wholesale verification code is ${r.verification_code}. It expires in 24 hours.`;
+  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`,"_blank");
+}
+async function loadLiveCarts(){
+  const {data,error}=await client.from("live_carts").select("*,live_cart_items(*)").order("updated_at",{ascending:false}).limit(100);
+  if(error){liveCartRows.innerHTML=`<tr><td colspan="6">${adminEscape(error.message)}</td></tr>`;return}
+  liveCarts=data||[];
+  liveCartRows.innerHTML=liveCarts.length?liveCarts.map(c=>{
+    const items=c.live_cart_items||[];
+    const total=items.reduce((sum,item)=>sum+Number(item.unit_price||0)*Number(item.quantity||0),0);
+    const productsText=items.length?items.map(item=>`<div><b>${adminEscape(item.quantity)}×</b> ${adminEscape(item.product_name)} <small>(${adminEscape(item.item_code)})</small></div>`).join(""):"Empty cart";
+    const visitor=c.customer_name||`Guest ${String(c.visitor_id).slice(0,8)}`;
+    const contact=[c.customer_phone,c.customer_address].filter(Boolean).map(adminEscape).join("<br>")||"Not entered yet";
+    return `<tr><td><b>${adminEscape(visitor)}</b><br><small>${adminEscape(c.customer_type)}</small></td><td>${contact}</td><td class="cart-products">${productsText}</td><td><b>${total.toFixed(2)} USD</b></td><td><span class="status-pill ${c.status==="submitted"?"verified":""}">${adminEscape(c.status)}</span></td><td>${new Date(c.updated_at).toLocaleString()}</td></tr>`;
+  }).join(""):'<tr><td colspan="6">No live carts yet.</td></tr>';
+}
 function render(){statProducts.textContent=products.length;statLow.textContent=products.filter(p=>p.stock<=5).length;statStock.textContent=products.reduce((a,p)=>a+p.stock,0);const q=(window.adminSearch?.value||"").trim().toLowerCase();const list=!q?products:products.filter(p=>`${p.id} ${p.barcode} ${p.name} ${p.brand} ${p.category}`.toLowerCase().includes(q));rows.innerHTML=list.map(p=>`<tr><td>${p.image?`<img class="thumb" src="${p.image}" loading="lazy" onerror="this.replaceWith(document.createTextNode('🐾'))">`:"🐾"}</td><td>${p.id}</td><td><b>${p.name}</b><br><small>${p.category}</small></td><td>${p.retail.toFixed(2)}</td><td>${p.wholesale.toFixed(2)}</td><td>${p.stock}</td><td><button class="btn btn-soft" onclick="openEditor('${p.id}')">Edit</button> <button class="btn btn-soft" onclick="removeProduct('${p.id}')">Delete</button></td></tr>`).join("")}
 function openEditor(code=""){editingCode=code||null;const p=products.find(x=>x.id===code)||{id:"",barcode:"",name:"",description:"",ingredients:"",brand:"TRIXIE",category:"Accessories",wholesale:"",retail:"",stock:"",image:"",active:true};editorTitle.textContent=code?"Edit Product":"Add Product";fId.value=p.id;fId.disabled=Boolean(code);fBarcode.value=p.barcode;fName.value=p.name;fDescription.value=p.description;fIngredients.value=p.ingredients;fBrand.value=p.brand;fCategory.value=p.category;fWholesale.value=p.wholesale;fRetail.value=p.retail;fStock.value=p.stock;fActive.checked=p.active;pendingImage=p.image;pendingFile=null;drawPreview();editorModal.classList.add("open")}
 function closeEditor(){editorModal.classList.remove("open")}
@@ -76,7 +104,7 @@ async function runOCR(file){
   }catch(error){ocrStatus.textContent="Could not read the photo. Try again with better light."}
   finally{ocrTarget=null}
 }
-document.addEventListener("DOMContentLoaded",async()=>{if(!window.PET_UNLEASH_SUPABASE_ANON_KEY||window.PET_UNLEASH_SUPABASE_ANON_KEY.startsWith("PASTE_")){alert("Add the Supabase anon public key to supabase-config.js first.");return}const {data:{session}}=await client.auth.getSession();if(session){loginBox.style.display="none";adminApp.style.display="block";await loadProducts()}});
+document.addEventListener("DOMContentLoaded",async()=>{if(!window.PET_UNLEASH_SUPABASE_ANON_KEY||window.PET_UNLEASH_SUPABASE_ANON_KEY.startsWith("PASTE_")){alert("Add the Supabase anon public key to supabase-config.js first.");return}const {data:{session}}=await client.auth.getSession();if(session){loginBox.style.display="none";adminApp.style.display="block";await Promise.all([loadProducts(),loadWholesaleRegistrations(),loadLiveCarts()]);setInterval(()=>{loadWholesaleRegistrations();loadLiveCarts()},30000)}});
 </script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <script src="admin-export.js"></script>
