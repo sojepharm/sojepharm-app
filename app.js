@@ -89,17 +89,17 @@ function applyLocalStock(productsList) {
 function normalizeProduct(item) {
   const itemCode = String(item.item_code ?? item.id ?? "");
   const brand = item.brand || "TRIXIE";
-  // All current TRIXIE dog-snack codes are in the 27… and 31… ranges.
-  // This restores the curated Dog Snacks group even when an imported row only says "Dog".
-  const category = brand.toUpperCase() === "TRIXIE" && /^(27|31)/.test(itemCode)
-    ? "Treats"
-    : (item.category || classifyProduct(item));
+  // The database is the source of truth. Do not infer a product type from its item-code prefix:
+  // TRIXIE uses overlapping number ranges for toys, care products and snacks.
+  const category = item.category || classifyProduct(item);
+  const subcategory = item.subcategory || "";
   return {
     id: itemCode,
     barcode: item.barcode || "",
     brand,
     name: item.name || "",
     category,
+    subcategory,
     description: item.description || "",
     wholesale: item.wholesale == null ? null : Number(item.wholesale),
     retail: Number(item.retail || 0),
@@ -113,7 +113,7 @@ async function getProducts() {
   const client = db();
   if (client) {
     const source = role() === "wholesale" ? "wholesale_storefront_products" : "retail_storefront_products";
-    const { data, error } = await client.from(source).select("item_code,barcode,name,brand,category,description,wholesale,retail,stock,image_url,active").order("name");
+    const { data, error } = await client.from(source).select("item_code,barcode,name,brand,category,subcategory,description,wholesale,retail,stock,image_url,active").order("name");
     if (!error) return applyLocalStock(data.map(normalizeProduct));
     console.warn("Could not load storefront products from Supabase", error.message);
   }
@@ -169,7 +169,13 @@ async function syncLiveCart(status = "draft") {
 function updateCartCount() {
   document.querySelectorAll("[data-cart-count]").forEach(element => element.textContent = cart.reduce((total, line) => total + line.qty, 0));
 }
-function currentPrice(product) { return role() === "wholesale" ? product.wholesale : product.retail; }
+function currentPrice(product) {
+  // Retail must always use the public retail price. Wholesale is only available
+  // after the current tab has an authorized wholesale session.
+  return role() === "wholesale"
+    ? Number(product.wholesale ?? product.retail ?? 0)
+    : Number(product.retail ?? 0);
+}
 const brandCategoryOrder = [
   "Treats", "Dog Food", "Cat Food", "Dog Snacks", "Cat Snacks",
   "Hygiene & Care", "Bowls", "Toys", "Leads, Collars & Harnesses",
@@ -178,7 +184,16 @@ const brandCategoryOrder = [
   "Cat Accessories", "Dog", "Cat", "Both"
 ];
 function brandGroup(product) {
-  const text = `${product.name || ""} ${product.description || ""} ${product.category || ""}`.toLowerCase();
+  const text = `${product.name || ""} ${product.description || ""} ${product.category || ""} ${product.subcategory || ""}`.toLowerCase();
+  const curated = String(product.subcategory || "").toLowerCase();
+  if (/snack|treat/.test(curated)) return "Treats";
+  if (/hygiene|care|clean/.test(curated)) return "Hygiene & Care";
+  if (/bowl|water bottle/.test(curated)) return "Bowls";
+  if (/toy/.test(curated)) return "Toys";
+  if (/bed|cushion/.test(curated)) return productAudience(product) === "cat" ? "Cat Beds & Resting Places" : "Dog Beds & Resting Places";
+  if (/transport|voyager|travel/.test(curated)) return "Pet Voyager";
+  if (/lead|collar|harness/.test(curated)) return "Leads, Collars & Harnesses";
+  if (/litter|scratching|home/.test(curated)) return "At Home";
   if (/snack|treat|chew|dried|jerky|chocolate|bone|rawhide|biscuit/.test(text)) return "Treats";
   if (/shampoo|diaper|poop bag|waste bag|hygiene|groom|brush|comb|fur care|tooth|nail|clean|litter|toilet/.test(text)) return "Hygiene & Care";
   if (/bowl|fountain|feeder|drinker|drinking|water dispenser|food dispenser/.test(text)) return "Bowls";
@@ -214,12 +229,16 @@ function filtered() {
 }
 function productAudience(product) {
   const category = String(product.category || "").toLowerCase();
-  const text = `${product.name || ""} ${product.description || ""}`.toLowerCase();
+  const subcategory = String(product.subcategory || "").toLowerCase();
+  const text = `${product.name || ""} ${product.description || ""} ${subcategory}`.toLowerCase();
+  const catSignal = /\b(cat|cats|kitten|kittens|feline|catnip|matatabi|litter|scratching)\b/.test(text);
+  const dogSignal = /\b(dog|dogs|puppy|puppies|canine)\b/.test(text);
+
+  // A clear product name wins over a broad imported category such as "Both".
+  if (catSignal && !dogSignal) return "cat";
+  if (dogSignal && !catSignal) return "dog";
   if (category.includes("cat")) return "cat";
   if (category.includes("dog")) return "dog";
-  if (category === "both") return "both";
-  if (/\b(cat|kitten|feline|catnip|matatabi|litter|scratching)\b/.test(text)) return "cat";
-  if (/\b(dog|puppy|canine)\b/.test(text)) return "dog";
   return "both";
 }
 function categoryMatches(product, selectedCategory) {
