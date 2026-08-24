@@ -4,7 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Pet Unleash</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=20260824b">
+  <link rel="stylesheet" href="image-brand-fix.css?v=20260824b">
 </head>
 <body>
   <header class="site-header">
@@ -50,7 +51,7 @@
       <main id="products" class="grid"></main>
     </section>
 
-    <section id="brands" class="brand-row"><div class="section-heading"><h2>Top Brands</h2><span>View all brands →</span></div><div class="brand-list"><b>ROYAL CANIN</b><b>PRO PLAN</b><b>ACANA</b><b>ORIJEN</b><b>BIOFORM</b><b>HAPPY DOG</b><b>Dr. Clauder's</b></div></section>
+    <section id="brands" class="brand-row"><div class="section-heading"><h2>Top Brands</h2><button class="text-button" type="button" onclick="showAllProducts()">View all products →</button></div><div class="brand-list"><span>ROYAL CANIN</span><span>PRO PLAN</span><span>ACANA</span><span>ORIJEN</span><button class="brand-filter" type="button" onclick="showBrandProducts('BIOFORM')">BIOFORM</button><span>HAPPY DOG</span><button class="brand-filter" type="button" onclick="showBrandProducts('TRIXIE')">TRIXIE</button></div></section>
   </main>
 
   <footer id="contact"><div class="page-width footer-grid"><div>✉ <span><b>Email</b><br>info@petunleash.com</span></div><div>☎ <span><b>Phone</b><br>+961 70 333 470</span></div><div>⌖ <span><b>Address</b><br>Lebanon</span></div><div>◷ <span><b>Working Hours</b><br>Mon - Sat: 9:00 AM - 7:00 PM</span></div></div></footer>
@@ -60,6 +61,6 @@
   <div id="wholesaleModal" class="modal"><div class="modal-card" style="max-width:420px"><div class="modal-head"><h2>Wholesale Login</h2><button class="icon-btn" onclick="closeWholesaleLogin()">×</button></div><form class="modal-body" onsubmit="wholesaleLogin(event)"><input id="whUser" type="tel" inputmode="tel" autocomplete="tel" placeholder="Phone number (e.g. 03 923 231)" style="margin-bottom:12px"><input id="whPass" type="password" autocomplete="current-password" placeholder="Password" style="margin-bottom:12px"><button class="btn btn-primary" style="width:100%" type="submit">Login</button><button class="btn btn-soft" style="width:100%;margin-top:10px" type="button" onclick="openWholesaleRegistration()">Create Wholesale Account</button><button class="btn btn-soft" style="width:100%;margin-top:10px" type="button" onclick="openWholesaleVerification()">Enter WhatsApp Code</button><button class="btn btn-soft" style="width:100%;margin-top:10px" type="button" onclick="logoutWholesale();closeWholesaleLogin()">Return to Retail</button></form></div></div>
   <div id="wholesaleRegisterModal" class="modal"><div class="modal-card" style="max-width:520px"><div class="modal-head"><h2>Create Wholesale Account</h2><button class="icon-btn" onclick="closeWholesaleRegistration()">×</button></div><form class="modal-body" onsubmit="registerWholesale(event)"><input id="regName" autocomplete="name" placeholder="Your full name" required style="margin-bottom:12px"><input id="regShop" placeholder="Shop or business name" required style="margin-bottom:12px"><input id="regPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="WhatsApp phone number" required style="margin-bottom:12px"><input id="regAddress" autocomplete="street-address" placeholder="Business address" style="margin-bottom:12px"><input id="regPassword" type="password" autocomplete="new-password" minlength="10" placeholder="Create password (10+ characters)" required style="margin-bottom:12px"><input id="regPasswordConfirm" type="password" autocomplete="new-password" minlength="10" placeholder="Confirm password" required style="margin-bottom:12px"><small style="display:block;margin-bottom:14px;color:#666">Use at least 10 characters with letters and numbers. Your password is encrypted and never shown to Pet Unleash.</small><button id="registerWholesaleBtn" class="btn btn-primary" style="width:100%" type="submit">Create Account</button></form></div></div>
   <div id="wholesaleVerifyModal" class="modal"><div class="modal-card" style="max-width:420px"><div class="modal-head"><h2>Verify WhatsApp Code</h2><button class="icon-btn" onclick="closeWholesaleVerification()">×</button></div><form class="modal-body" onsubmit="verifyWholesaleCode(event)"><p>Enter the 6-digit code sent by Pet Unleash on WhatsApp.</p><input id="verifyPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="WhatsApp phone number" required style="margin-bottom:12px"><input id="verifyCode" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="6-digit code" required style="margin-bottom:12px"><button class="btn btn-primary" style="width:100%" type="submit">Activate Wholesale Account</button></form></div></div>
-  <script src="data-local.js"></script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase-config.js"></script><script src="app.js"></script>
+  <script src="data-local.js?v=20260824b"></script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase-config.js"></script><script src="app.js?v=20260824b"></script>
 </body>
 </html>
