@@ -18,21 +18,21 @@ let cartSyncTimer = null;
 const departmentCards = {
   "Dog Accessories": [
     ["Dog Beds & Resting Places", "🛏️"], ["Leads, Collars & Harnesses", "🦮"], ["Toys", "🎾"], ["Dog Snacks", "🦴"],
-    ["Bowls", "🥣"], ["At Home", "🏠"], ["Pet Voyager", "🚗"], ["Hygiene & Care", "🧴"]
+    ["Bowls & Water Bottles", "🥣"], ["At Home", "🏠"], ["Transport & Travel", "🚗"], ["Hygiene & Care", "🧴"]
   ],
   "Cat Accessories": [
-    ["Cat Beds & Resting Places", "🛏️"], ["Toys", "🐭"], ["Cat Snacks", "🦴"], ["Bowls", "🥣"],
-    ["Hygiene & Care", "🧴"], ["Pet Voyager", "👜"], ["At Home", "🏠"], ["Leads, Collars & Harnesses", "🐈"]
+    ["Cat Beds & Resting Places", "🛏️"], ["Toys for Cats", "🐭"], ["Cat Snacks", "🦴"], ["Bowls & Water Bottles", "🥣"],
+    ["Transport & Travel", "👜"], ["Cat Litter Tray", "🐈"], ["Hygiene & Care", "🧴"], ["At Home", "🏠"]
   ]
 };
 const categoryImages = {
   "Dog Accessories": {
     "Dog Beds & Resting Places": "dog-bed", "Leads, Collars & Harnesses": "dog-leads", "Toys": "dog-toys", "Dog Snacks": "dog-snacks",
-    "Bowls": "dog-bowls", "At Home": "dog-home", "Pet Voyager": "dog-voyager", "Hygiene & Care": "dog-hygiene"
+    "Bowls & Water Bottles": "dog-bowls", "At Home": "dog-home", "Transport & Travel": "dog-voyager", "Hygiene & Care": "dog-hygiene"
   },
   "Cat Accessories": {
-    "Cat Beds & Resting Places": "cat-bed", "Toys": "cat-toys", "Cat Snacks": "cat-snacks", "Bowls": "cat-bowls",
-    "Hygiene & Care": "cat-hygiene", "Pet Voyager": "cat-voyager", "At Home": "cat-home", "Leads, Collars & Harnesses": "cat-leads"
+    "Cat Beds & Resting Places": "cat-bed", "Toys for Cats": "cat-toys", "Cat Snacks": "cat-snacks", "Bowls & Water Bottles": "cat-bowls",
+    "Transport & Travel": "cat-voyager", "Cat Litter Tray": "cat-leads", "Hygiene & Care": "cat-hygiene", "At Home": "cat-home"
   }
 };
 
@@ -213,6 +213,10 @@ function filtered() {
 }
 function categoryMatches(productCategory, selectedCategory) {
   if (productCategory === selectedCategory) return true;
+  if (selectedCategory === "Bowls & Water Bottles" && productCategory === "Bowls") return true;
+  if (selectedCategory === "Transport & Travel" && productCategory === "Pet Voyager") return true;
+  if (selectedCategory === "Toys for Cats" && productCategory === "Toys") return true;
+  if (selectedCategory === "Cat Litter Tray" && productCategory === "Cat Litter") return true;
   if ((selectedCategory === "Dog Snacks" || selectedCategory === "Cat Snacks") && productCategory === "Treats") return true;
   const dog = ["Dog Beds & Resting Places", "Leads, Collars & Harnesses", "Toys", "Dog Snacks", "Bowls", "At Home", "Pet Voyager", "Hygiene & Care"];
   const cat = ["Cat Beds & Resting Places", "Leads, Collars & Harnesses", "Toys", "Cat Snacks", "Bowls", "At Home", "Pet Voyager", "Hygiene & Care"];
@@ -228,7 +232,14 @@ function renderProducts() {
     grid.innerHTML = `<p class="empty-products">No products found in this selection.</p>`;
     return;
   }
-  grid.innerHTML = list.map(product => `
+  let previousGroup = "";
+  grid.innerHTML = list.map(product => {
+    const group = activeBrand === "ALL" ? "" : brandGroup(product);
+    const groupHeading = group && group !== previousGroup
+      ? `<div class="product-group-heading"><p>${escapeHtml(activeBrand)}</p><h3>${escapeHtml(group)}</h3></div>`
+      : "";
+    previousGroup = group;
+    return `${groupHeading}
     <article class="card">
       <div class="image-wrap">${product.image ? `<img src="${product.image}" alt="${product.name}">` : "🐾"}</div>
       <div class="card-body">
@@ -237,7 +248,8 @@ function renderProducts() {
         <div class="price-row"><div><small>${role() === "wholesale" ? "Wholesale" : "Retail"} price</small><div class="price">${money(currentPrice(product))}</div>${role() === "wholesale" ? `<div class="wholesale-price">Retail ${money(product.retail)}</div>` : ""}</div><div class="stock ${product.stock <= 0 ? "out" : ""}">${product.stock > 0 ? `${product.stock} in stock` : "Out of stock"}</div></div>
         <div class="card-actions"><input id="qty-${product.id}" class="qty-input" type="number" min="1" max="${Math.max(1, product.stock)}" value="1"><button class="btn btn-primary" style="flex:1" ${product.stock <= 0 ? "disabled" : ""} onclick="addToCart('${product.id}')">Add to Cart</button></div>
       </div>
-    </article>`).join("");
+    </article>`;
+  }).join("");
   document.querySelectorAll("[data-role-label]").forEach(element => element.textContent = role() === "wholesale" ? "Wholesale" : "Retail");
 }
 function addToCart(id) {
