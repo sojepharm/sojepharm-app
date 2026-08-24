@@ -1,0 +1,11 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/rofluedkfz/petunleash.com/
+    - /bin/cp index.html $DEPLOYPATH
+    - /bin/cp app.js $DEPLOYPATH
+    - /bin/cp admin.html $DEPLOYPATH
+    - /bin/cp data.json $DEPLOYPATH
+    - /bin/cp data-local.js $DEPLOYPATH
+    - /bin/cp image-brand-fix.css $DEPLOYPATH
+    - /bin/cp -R assets $DEPLOYPATH
