@@ -19,8 +19,8 @@ revoke all on table public.wholesale_registrations from anon, authenticated;
 grant select, update, delete on table public.wholesale_registrations to authenticated;
 create policy "Admin manages wholesale registrations" on public.wholesale_registrations
 for all to authenticated
-using ((select auth.jwt() ->> 'email') = 'danielchaaly@gmail.com')
-with check ((select auth.jwt() ->> 'email') = 'danielchaaly@gmail.com');
+using (((select auth.jwt()) ->> 'email') = 'danielchaaly@gmail.com')
+with check (((select auth.jwt()) ->> 'email') = 'danielchaaly@gmail.com');
 
 create table if not exists public.live_carts (
   id uuid primary key default gen_random_uuid(),
@@ -39,8 +39,8 @@ revoke all on table public.live_carts from anon, authenticated;
 grant select, update, delete on table public.live_carts to authenticated;
 create policy "Admin manages live carts" on public.live_carts
 for all to authenticated
-using ((select auth.jwt() ->> 'email') = 'danielchaaly@gmail.com')
-with check ((select auth.jwt() ->> 'email') = 'danielchaaly@gmail.com');
+using (((select auth.jwt()) ->> 'email') = 'danielchaaly@gmail.com')
+with check (((select auth.jwt()) ->> 'email') = 'danielchaaly@gmail.com');
 
 create table if not exists public.live_cart_items (
   id uuid primary key default gen_random_uuid(),
@@ -58,14 +58,15 @@ grant select, update, delete on table public.live_cart_items to authenticated;
 create policy "Admin manages live cart items" on public.live_cart_items
 for all to authenticated
 using (
-  (select auth.jwt() ->> 'email') = 'danielchaaly@gmail.com'
+  ((select auth.jwt()) ->> 'email') = 'danielchaaly@gmail.com'
   and exists (select 1 from public.live_carts c where c.id = cart_id)
 )
 with check (
-  (select auth.jwt() ->> 'email') = 'danielchaaly@gmail.com'
+  ((select auth.jwt()) ->> 'email') = 'danielchaaly@gmail.com'
   and exists (select 1 from public.live_carts c where c.id = cart_id)
 );
 
 create index if not exists live_cart_items_cart_id_idx on public.live_cart_items(cart_id);
 create index if not exists live_carts_updated_at_idx on public.live_carts(updated_at desc);
+create index if not exists live_carts_user_id_idx on public.live_carts(user_id);
 create index if not exists wholesale_registrations_created_at_idx on public.wholesale_registrations(created_at desc);
