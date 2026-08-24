@@ -1,6 +1,7 @@
 const PHONE = "96170333470";
 const CART_KEY = "petUnleashCartV3";
 const ROLE_KEY = "petUnleashRoleV3";
+const VISITOR_KEY = "petUnleashVisitorV1";
 const INVOICE_KEY = "petUnleashInvoiceCounterV1";
 // Local test storage: lets us verify the complete order flow before connecting live stock.
 const LOCAL_STOCK_KEY = "petUnleashLocalStockV15";
@@ -11,6 +12,7 @@ let activeCategory = "ALL";
 let currentInvoice = null;
 let currentRole = "retail";
 let supabaseClient = null;
+let cartSyncTimer = null;
 
 const departmentCards = {
   "Dog Accessories": [
@@ -114,6 +116,46 @@ async function getProducts() {
 function saveCart() {
   localStorage.setItem(CART_KEY, JSON.stringify(cart));
   updateCartCount();
+  scheduleCartSync();
+}
+function visitorId() {
+  let id = localStorage.getItem(VISITOR_KEY);
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem(VISITOR_KEY, id);
+  }
+  return id;
+}
+function scheduleCartSync() {
+  clearTimeout(cartSyncTimer);
+  cartSyncTimer = setTimeout(() => syncLiveCart("draft"), 700);
+}
+async function syncLiveCart(status = "draft") {
+  if (!cart.length && !localStorage.getItem(VISITOR_KEY)) return;
+  const client = db();
+  if (!client) return;
+  const items = cart.map(line => {
+    const product = products.find(item => item.id === line.id);
+    return product ? {
+      item_code: product.id,
+      product_name: product.name,
+      quantity: line.qty,
+      unit_price: currentPrice(product)
+    } : null;
+  }).filter(Boolean);
+  const { error } = await client.functions.invoke("storefront-services", {
+    body: {
+      action: "sync_cart",
+      visitor_id: visitorId(),
+      items,
+      customer_name: document.querySelector("#customerName")?.value || "",
+      customer_phone: document.querySelector("#customerPhone")?.value || "",
+      customer_address: document.querySelector("#customerAddress")?.value || "",
+      customer_type: role(),
+      status
+    }
+  });
+  if (error) console.warn("Could not sync live cart", error.message);
 }
 function updateCartCount() {
   document.querySelectorAll("[data-cart-count]").forEach(element => element.textContent = cart.reduce((total, line) => total + line.qty, 0));
@@ -235,10 +277,11 @@ function saveLocalOrderAndDeductStock(invoice) {
   renderProducts();
   return true;
 }
-function sendInvoiceWhatsApp() {
+async function sendInvoiceWhatsApp() {
   if (!currentInvoice) return;
   const invoice = currentInvoice;
   if (!saveLocalOrderAndDeductStock(invoice)) return;
+  await syncLiveCart("submitted");
   const message = ["PET UNLEASH INVOICE", `Invoice No: ${invoice.number}`, `Date: ${invoice.date}`, `Customer type: ${invoice.customerType}`, `Deliver to: ${invoice.customer.name}`, `Phone: ${invoice.customer.phone}`, invoice.customer.address ? `Address: ${invoice.customer.address}` : "", "", ...invoice.items.map(item => `${item.product.name} (${item.product.id}) x${item.qty} = ${money(item.subtotal)}`), "", `TOTAL: ${money(invoice.total)}`].filter(Boolean).join("\n");
   cart = [];
   saveCart();
@@ -279,6 +322,67 @@ function normalizeLebanonPhone(value) {
   if (raw.startsWith("0")) return `+961${raw.slice(1)}`;
   return `+961${raw}`;
 }
+function phoneLoginEmail(phone) {
+  return `${phone.replace(/\D/g, "")}@phone.petunleash.invalid`;
+}
+function openWholesaleRegistration() {
+  closeWholesaleLogin();
+  document.querySelector("#wholesaleRegisterModal").classList.add("open");
+}
+function closeWholesaleRegistration() {
+  document.querySelector("#wholesaleRegisterModal").classList.remove("open");
+}
+function openWholesaleVerification(phone = "") {
+  closeWholesaleRegistration();
+  document.querySelector("#verifyPhone").value = phone;
+  document.querySelector("#wholesaleVerifyModal").classList.add("open");
+}
+function closeWholesaleVerification() {
+  document.querySelector("#wholesaleVerifyModal").classList.remove("open");
+}
+async function registerWholesale(event) {
+  event?.preventDefault();
+  const client = db();
+  const phone = normalizeLebanonPhone(document.querySelector("#regPhone").value);
+  const password = document.querySelector("#regPassword").value;
+  const confirmPassword = document.querySelector("#regPasswordConfirm").value;
+  if (password !== confirmPassword) return alert("Passwords do not match.");
+  const button = document.querySelector("#registerWholesaleBtn");
+  button.disabled = true;
+  button.textContent = "Creating account…";
+  const { data, error } = await client.functions.invoke("storefront-services", {
+    body: {
+      action: "register",
+      customer_name: document.querySelector("#regName").value,
+      shop_name: document.querySelector("#regShop").value,
+      phone,
+      address: document.querySelector("#regAddress").value,
+      password
+    }
+  });
+  button.disabled = false;
+  button.textContent = "Create Account";
+  if (error || data?.error) return alert(data?.error || "Could not create the account.");
+  document.querySelector("#regPassword").value = "";
+  document.querySelector("#regPasswordConfirm").value = "";
+  alert(data.message || "Account created. Wait for your WhatsApp code.");
+  openWholesaleVerification(phone);
+}
+async function verifyWholesaleCode(event) {
+  event?.preventDefault();
+  const client = db();
+  const phone = normalizeLebanonPhone(document.querySelector("#verifyPhone").value);
+  const code = document.querySelector("#verifyCode").value.trim();
+  const { data, error } = await client.functions.invoke("storefront-services", {
+    body: { action: "verify", phone, code }
+  });
+  if (error || data?.error) return alert(data?.error || "Could not verify the code.");
+  closeWholesaleVerification();
+  document.querySelector("#whUser").value = phone;
+  document.querySelector("#verifyCode").value = "";
+  openWholesaleLogin();
+  alert("Wholesale account activated. Enter your password to login.");
+}
 function clearWholesaleFields() {
   document.querySelector("#whUser").value = "";
   document.querySelector("#whPass").value = "";
@@ -306,7 +410,7 @@ async function wholesaleLogin(event) {
   const password = document.querySelector("#whPass").value;
   if (!client) return alert("Login service is temporarily unavailable.");
   if (!phone || !password) return alert("Enter phone number and password.");
-  const { error } = await client.auth.signInWithPassword({ phone, password });
+  const { error } = await client.auth.signInWithPassword({ email: phoneLoginEmail(phone), password });
   if (error || !await isWholesaleAuthorized(client)) {
     await client.auth.signOut({ scope: "local" });
     currentRole = "retail";
@@ -328,6 +432,9 @@ async function logoutWholesale() {
 }
 document.addEventListener("input", event => { if (event.target.matches("#search,#foodType")) renderProducts(); });
 document.addEventListener("change", event => { if (event.target.matches("#foodType")) renderProducts(); });
+document.addEventListener("input", event => {
+  if (event.target.matches("#customerName,#customerPhone,#customerAddress")) scheduleCartSync();
+});
 document.addEventListener("DOMContentLoaded", async () => {
   localStorage.removeItem(ROLE_KEY);
   await initializeWholesaleSession();
