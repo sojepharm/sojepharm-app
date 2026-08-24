@@ -176,13 +176,27 @@ const brandCategoryOrder = [
   "Pet Voyager", "At Home", "Cat Litter", "Dog Accessories",
   "Cat Accessories", "Dog", "Cat", "Both"
 ];
+function brandGroup(product) {
+  const text = `${product.name || ""} ${product.description || ""} ${product.category || ""}`.toLowerCase();
+  if (/snack|treat|chew|dried|jerky|chocolate|bone|rawhide|biscuit/.test(text)) return "Treats";
+  if (/shampoo|diaper|poop bag|waste bag|hygiene|groom|brush|comb|fur care|tooth|nail|clean|litter|toilet/.test(text)) return "Hygiene & Care";
+  if (/bowl|fountain|feeder|drinker|drinking|water dispenser|food dispenser/.test(text)) return "Bowls";
+  if (/toy|ball|rope|plush|dino|dumbbell|activity|playing|squeaker|tugger/.test(text)) return "Toys";
+  if (/bed|cave|cushion|blanket|resting|kennel/.test(text)) return /cat/.test(text) ? "Cat Beds & Resting Places" : "Dog Beds & Resting Places";
+  if (/transport|carrier|capri|voyager|travel box|travel bag|cage/.test(text)) return "Pet Voyager";
+  if (/lead|leash|collar|harness/.test(text)) return "Leads, Collars & Harnesses";
+  if (/sock|mat|door|home|cover|stairs|ramp/.test(text)) return "At Home";
+  return product.category || "Other";
+}
 function brandProductOrder(a, b) {
   if (activeBrand === "ALL") return 0;
-  const aRank = brandCategoryOrder.indexOf(a.category);
-  const bRank = brandCategoryOrder.indexOf(b.category);
+  const aGroup = brandGroup(a);
+  const bGroup = brandGroup(b);
+  const aRank = brandCategoryOrder.indexOf(aGroup);
+  const bRank = brandCategoryOrder.indexOf(bGroup);
   const categoryDifference = (aRank < 0 ? 999 : aRank) - (bRank < 0 ? 999 : bRank);
   if (categoryDifference) return categoryDifference;
-  const categoryNameDifference = String(a.category || "Other").localeCompare(String(b.category || "Other"));
+  const categoryNameDifference = String(aGroup).localeCompare(String(bGroup));
   if (categoryNameDifference) return categoryNameDifference;
   return String(a.name).localeCompare(String(b.name), undefined, { numeric: true });
 }
