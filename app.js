@@ -184,7 +184,6 @@ const brandCategoryOrder = [
   "Cat Accessories", "Dog", "Cat", "Both"
 ];
 function brandGroup(product) {
-  const text = `${product.name || ""} ${product.description || ""} ${product.category || ""} ${product.subcategory || ""}`.toLowerCase();
   const curated = String(product.subcategory || "").toLowerCase();
   if (/snack|treat/.test(curated)) return "Treats";
   if (/hygiene|care|clean/.test(curated)) return "Hygiene & Care";
@@ -194,14 +193,8 @@ function brandGroup(product) {
   if (/transport|voyager|travel/.test(curated)) return "Pet Voyager";
   if (/lead|collar|harness/.test(curated)) return "Leads, Collars & Harnesses";
   if (/litter|scratching|home/.test(curated)) return "At Home";
-  if (/snack|treat|chew|dried|jerky|chocolate|bone|rawhide|biscuit/.test(text)) return "Treats";
-  if (/shampoo|diaper|poop bag|waste bag|hygiene|groom|brush|comb|fur care|tooth|nail|clean|litter|toilet/.test(text)) return "Hygiene & Care";
-  if (/bowl|fountain|feeder|drinker|drinking|water dispenser|food dispenser/.test(text)) return "Bowls";
-  if (/toy|ball|rope|plush|dino|dumbbell|activity|playing|squeaker|tugger/.test(text)) return "Toys";
-  if (/bed|cave|cushion|blanket|resting|kennel/.test(text)) return /cat/.test(text) ? "Cat Beds & Resting Places" : "Dog Beds & Resting Places";
-  if (/transport|carrier|capri|voyager|travel box|travel bag|cage/.test(text)) return "Pet Voyager";
-  if (/lead|leash|collar|harness/.test(text)) return "Leads, Collars & Harnesses";
-  if (/sock|mat|door|home|cover|stairs|ramp/.test(text)) return "At Home";
+  // Never guess a storefront section from product names. Imported names can
+  // contain words such as ball, bone or cat even when the curated section is different.
   return product.category || "Other";
 }
 function brandProductOrder(a, b) {
@@ -229,40 +222,40 @@ function filtered() {
 }
 function productAudience(product) {
   const category = String(product.category || "").toLowerCase();
-  const subcategory = String(product.subcategory || "").toLowerCase();
-  const text = `${product.name || ""} ${product.description || ""} ${subcategory}`.toLowerCase();
-  const catSignal = /\b(cat|cats|kitten|kittens|feline|catnip|matatabi|litter|scratching)\b/.test(text);
-  const dogSignal = /\b(dog|dogs|puppy|puppies|canine)\b/.test(text);
-
-  // A clear product name wins over a broad imported category such as "Both".
-  if (catSignal && !dogSignal) return "cat";
-  if (dogSignal && !catSignal) return "dog";
   if (category.includes("cat")) return "cat";
   if (category.includes("dog")) return "dog";
   return "both";
 }
 function categoryMatches(product, selectedCategory) {
-  const productCategory = product.category;
+  const productCategory = String(product.category || "").toLowerCase();
+  const subcategory = String(product.subcategory || "").toLowerCase();
   const audience = productAudience(product);
   const wantedAudience = activeDepartment === "Cats" ? "cat" : activeDepartment === "Dogs" ? "dog" : "both";
   const audienceMatches = wantedAudience === "both" || audience === wantedAudience || audience === "both";
   if (!audienceMatches) return false;
-  if (productCategory === selectedCategory) return true;
-  const group = brandGroup(product);
-  if (selectedCategory === "Bowls & Water Bottles") return group === "Bowls";
-  if (selectedCategory === "Transport & Travel") return group === "Pet Voyager";
-  if (selectedCategory === "Toys" || selectedCategory === "Toys for Cats") return group === "Toys";
-  if (selectedCategory === "Cat Litter Tray") return group === "Hygiene & Care" && /litter|toilet/.test(`${product.name} ${product.description}`.toLowerCase());
-  if (selectedCategory === "Dog Snacks" || selectedCategory === "Cat Snacks") return group === "Treats";
-  if (selectedCategory === "Hygiene & Care") return group === "Hygiene & Care";
-  if (selectedCategory === "At Home") return group === "At Home";
-  if (selectedCategory === "Leads, Collars & Harnesses") return group === "Leads, Collars & Harnesses";
-  if (selectedCategory === "Dog Beds & Resting Places" || selectedCategory === "Cat Beds & Resting Places") return /Beds & Resting Places$/.test(group);
-  const dog = ["Dog Beds & Resting Places", "Leads, Collars & Harnesses", "Toys", "Dog Snacks", "Bowls", "At Home", "Pet Voyager", "Hygiene & Care"];
-  const cat = ["Cat Beds & Resting Places", "Leads, Collars & Harnesses", "Toys", "Cat Snacks", "Bowls", "At Home", "Pet Voyager", "Hygiene & Care"];
-  if (selectedCategory === "Dogs") return productCategory === "Dog Food" || productCategory === "Dog Accessories" || productCategory === "Treats" || dog.includes(productCategory);
-  if (selectedCategory === "Cats") return productCategory === "Cat Food" || productCategory === "Cat Accessories" || productCategory === "Cat Litter" || cat.includes(productCategory);
-  return (selectedCategory === "Dog Accessories" && dog.includes(productCategory)) || (selectedCategory === "Cat Accessories" && cat.includes(productCategory));
+  const isDog = audience === "dog";
+  const isCat = audience === "cat";
+  const isBoth = audience === "both";
+  const inSection = (...names) => names.includes(subcategory);
+
+  if (selectedCategory === "Dog Snacks") return isDog && inSection("dog snacks", "treats");
+  if (selectedCategory === "Cat Snacks") return isCat && inSection("cat snacks", "treats");
+  if (selectedCategory === "Toys") return isDog && inSection("toys");
+  if (selectedCategory === "Toys for Cats") return isCat && inSection("toys");
+  if (selectedCategory === "Leads, Collars & Harnesses") return isDog && inSection("leads, collars & harnesses");
+  if (selectedCategory === "Dog Beds & Resting Places") return isDog && inSection("beds & cushions", "cushion");
+  if (selectedCategory === "Cat Beds & Resting Places") return isCat && inSection("beds & cushions", "cushion");
+  if (selectedCategory === "Bowls & Water Bottles") return (isDog || isCat || isBoth) && inSection("bowls", "bowls & water bottles");
+  if (selectedCategory === "Transport & Travel") return (isDog || isCat || isBoth) && inSection("pet voyager", "transport & travel");
+  if (selectedCategory === "Hygiene & Care") return (isDog || isCat || isBoth) && inSection("hygiene", "hygiene & care");
+  if (selectedCategory === "At Home") return (isDog || isCat) && inSection("at home", "scratching");
+  if (selectedCategory === "Cat Litter Tray") {
+    const text = `${product.name || ""} ${product.description || ""}`.toLowerCase();
+    return isCat && inSection("hygiene", "hygiene & care") && /litter|toilet/.test(text);
+  }
+  if (selectedCategory === "Dogs") return isDog;
+  if (selectedCategory === "Cats") return isCat;
+  return productCategory === String(selectedCategory || "").toLowerCase();
 }
 function renderProducts() {
   const grid = document.querySelector("#products");
