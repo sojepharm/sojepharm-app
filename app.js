@@ -9,6 +9,7 @@ const LOCAL_ORDERS_KEY = "petUnleashLocalOrdersV15";
 let products = [];
 let cart = JSON.parse(localStorage.getItem(CART_KEY) || "[]");
 let activeCategory = "ALL";
+let activeBrand = "ALL";
 let currentInvoice = null;
 let currentRole = "retail";
 let supabaseClient = null;
@@ -85,12 +86,19 @@ function applyLocalStock(productsList) {
 }
 
 function normalizeProduct(item) {
+  const itemCode = String(item.item_code ?? item.id ?? "");
+  const brand = item.brand || "TRIXIE";
+  // All current TRIXIE dog-snack codes are in the 27… and 31… ranges.
+  // This restores the curated Dog Snacks group even when an imported row only says "Dog".
+  const category = brand.toUpperCase() === "TRIXIE" && /^(27|31)/.test(itemCode)
+    ? "Treats"
+    : (item.category || classifyProduct(item));
   return {
-    id: item.item_code ?? item.id,
+    id: itemCode,
     barcode: item.barcode || "",
-    brand: item.brand || "TRIXIE",
+    brand,
     name: item.name || "",
-    category: item.category || classifyProduct(item),
+    category,
     description: item.description || "",
     wholesale: item.wholesale == null ? null : Number(item.wholesale),
     retail: Number(item.retail || 0),
@@ -161,14 +169,33 @@ function updateCartCount() {
   document.querySelectorAll("[data-cart-count]").forEach(element => element.textContent = cart.reduce((total, line) => total + line.qty, 0));
 }
 function currentPrice(product) { return role() === "wholesale" ? product.wholesale : product.retail; }
+const brandCategoryOrder = [
+  "Treats", "Dog Food", "Cat Food", "Dog Snacks", "Cat Snacks",
+  "Hygiene & Care", "Bowls", "Toys", "Leads, Collars & Harnesses",
+  "Dog Beds & Resting Places", "Cat Beds & Resting Places",
+  "Pet Voyager", "At Home", "Cat Litter", "Dog Accessories",
+  "Cat Accessories", "Dog", "Cat", "Both"
+];
+function brandProductOrder(a, b) {
+  if (activeBrand === "ALL") return 0;
+  const aRank = brandCategoryOrder.indexOf(a.category);
+  const bRank = brandCategoryOrder.indexOf(b.category);
+  const categoryDifference = (aRank < 0 ? 999 : aRank) - (bRank < 0 ? 999 : bRank);
+  if (categoryDifference) return categoryDifference;
+  const categoryNameDifference = String(a.category || "Other").localeCompare(String(b.category || "Other"));
+  if (categoryNameDifference) return categoryNameDifference;
+  return String(a.name).localeCompare(String(b.name), undefined, { numeric: true });
+}
 function filtered() {
   const query = (document.querySelector("#search")?.value || "").toLowerCase().trim();
   const foodType = document.querySelector("#foodType")?.value || "ALL";
   const category = activeCategory;
   return products.filter(product => product.active !== false)
+    .filter(product => activeBrand === "ALL" || String(product.brand).toUpperCase() === activeBrand)
     .filter(product => foodType === "ALL" || product.category === foodType)
     .filter(product => category === "ALL" || categoryMatches(product.category, category))
-    .filter(product => `${product.id} ${product.barcode} ${product.name} ${product.brand}`.toLowerCase().includes(query));
+    .filter(product => `${product.id} ${product.barcode} ${product.name} ${product.brand}`.toLowerCase().includes(query))
+    .sort(brandProductOrder);
 }
 function categoryMatches(productCategory, selectedCategory) {
   if (productCategory === selectedCategory) return true;
@@ -183,6 +210,10 @@ function renderProducts() {
   const grid = document.querySelector("#products");
   if (!grid) return;
   const list = filtered();
+  if (!list.length) {
+    grid.innerHTML = `<p class="empty-products">No products found in this selection.</p>`;
+    return;
+  }
   grid.innerHTML = list.map(product => `
     <article class="card">
       <div class="image-wrap">${product.image ? `<img src="${product.image}" alt="${product.name}">` : "🐾"}</div>
@@ -289,6 +320,7 @@ async function sendInvoiceWhatsApp() {
   window.open(`https://wa.me/${PHONE}?text=${encodeURIComponent(message)}`, "_blank");
 }
 function setCategory(category) {
+  activeBrand = "ALL";
   activeCategory = category;
   document.querySelector("#shop").hidden = false;
   document.querySelector("#productHeading").textContent = category === "ALL" ? "Featured Products" : category;
@@ -310,7 +342,18 @@ function openDepartment(department) {
 }
 function openSubcategory(category) { setCategory(category); document.querySelector("#shop").scrollIntoView({behavior:"smooth"}); }
 function showAllProducts() { document.querySelector("#subcategories").hidden = true; setCategory("ALL"); document.querySelector("#shop").scrollIntoView({behavior:"smooth"}); }
-function showHome() { document.querySelector("#subcategories").hidden = true; document.querySelector("#shop").hidden = true; activeCategory = "ALL"; document.querySelector("#top").scrollIntoView({behavior:"smooth"}); }
+function showBrandProducts(brand) {
+  activeCategory = "ALL";
+  activeBrand = String(brand || "").toUpperCase();
+  document.querySelector("#subcategories").hidden = true;
+  document.querySelector("#foodType").value = "ALL";
+  document.querySelector("#search").value = "";
+  document.querySelector("#shop").hidden = false;
+  document.querySelector("#productHeading").textContent = `${brand} Products`;
+  renderProducts();
+  document.querySelector("#shop").scrollIntoView({behavior:"smooth"});
+}
+function showHome() { document.querySelector("#subcategories").hidden = true; document.querySelector("#shop").hidden = true; activeCategory = "ALL"; activeBrand = "ALL"; document.querySelector("#top").scrollIntoView({behavior:"smooth"}); }
 function openWholesaleLogin() { document.querySelector("#wholesaleModal").classList.add("open"); }
 function closeWholesaleLogin() { document.querySelector("#wholesaleModal").classList.remove("open"); }
 function normalizeLebanonPhone(value) {
